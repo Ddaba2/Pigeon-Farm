@@ -1,0 +1,22 @@
+{
+  "edgeCompatibility": {
+    "localStorage": {
+      "fallback": "memory",
+      "enabled": true
+    },
+    "polyfills": {
+      "promise": true,
+      "fetch": true,
+      "array": true
+    },
+    "security": {
+      "cors": "relaxed",
+      "csp": "flexible"
+    }
+  },
+  "appSettings": {
+    "storage": "memory",
+    "debug": true,
+    "version": "1.0.0"
+  }
+} 
