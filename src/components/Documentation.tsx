@@ -456,7 +456,7 @@ const Documentation: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  <span className="text-gray-700 dark:text-gray-300">Utilisez les notifications pour rester informé</span>
+                  <span className="text-gray-700 dark:text-gray-300">Notifications supprimées</span>
                 </div>
               </div>
             </div>

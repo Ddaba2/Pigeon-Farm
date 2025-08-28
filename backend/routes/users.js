@@ -1,189 +1,204 @@
 import express from 'express';
-import pool from '../config/database.js';
-import { body, validationResult } from 'express-validator';
-import { logAudit } from '../utils/audit.js';
+import { authenticateUser, requireAdmin } from '../middleware/auth.js';
+import { asyncHandler } from '../utils/errorHandler.js';
+import UserService from '../services/userService.js';
 
 const router = express.Router();
 
-// Validation pour la création d'utilisateur
-const createUserValidation = [
-  body('username').isLength({ min: 3 }).withMessage('Le nom d\'utilisateur doit contenir au moins 3 caractères'),
-  body('email').isEmail().withMessage('Email invalide'),
-  body('password').isLength({ min: 6 }).withMessage('Le mot de passe doit contenir au moins 6 caractères'),
-  body('full_name').isLength({ min: 2 }).withMessage('Le nom complet doit contenir au moins 2 caractères')
-];
-
-// Validation pour la modification d'utilisateur
-const updateUserValidation = [
-  body('username').optional().isLength({ min: 3 }).withMessage('Le nom d\'utilisateur doit contenir au moins 3 caractères'),
-  body('email').optional().isEmail().withMessage('Email invalide'),
-  body('full_name').optional().isLength({ min: 2 }).withMessage('Le nom complet doit contenir au moins 2 caractères')
-];
-
 // GET /api/users - Récupérer tous les utilisateurs (admin seulement)
-router.get('/', async (req, res) => {
+router.get('/', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, username, email, full_name, role, created_at FROM users ORDER BY created_at DESC');
-    res.json(rows);
-  } catch (err) {
-    console.error('Erreur récupération utilisateurs:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/users/:id - Récupérer un utilisateur spécifique (admin seulement)
-router.get('/:id', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT id, username, email, full_name, role, created_at FROM users WHERE id = ?', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Utilisateur non trouvé' });
-    res.json(rows[0]);
-  } catch (err) {
-    console.error('Erreur récupération utilisateur:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/users - Créer un nouvel utilisateur (admin seulement)
-router.post('/', createUserValidation, async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
-    const { username, email, password, full_name, role = 'user' } = req.body;
+    const users = await UserService.getAllUsers();
     
-    // Vérifier si l'utilisateur existe déjà
-    const [existingUsers] = await pool.query('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
-    if (existingUsers.length > 0) {
-      return res.status(400).json({ error: 'Nom d\'utilisateur ou email déjà utilisé' });
-    }
-    
-    // Hasher le mot de passe (MD5 pour la compatibilité)
-    const crypto = await import('crypto');
-    const hashedPassword = crypto.createHash('md5').update(password).digest('hex');
-    
-    const [result] = await pool.query(
-      'INSERT INTO users (username, email, password, full_name, role) VALUES (?, ?, ?, ?, ?)',
-      [username, email, hashedPassword, full_name, role]
-    );
-    
-    await logAudit({
-      entity: 'users',
-      entityId: result.insertId,
-      action: 'create',
-      userId: req.user.id,
-      details: { username, email, full_name, role }
+    res.json({
+      success: true,
+      data: users
     });
-    
-    res.status(201).json({ id: result.insertId });
-  } catch (err) {
-    console.error('Erreur création utilisateur:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// PUT /api/users/:id - Modifier un utilisateur (admin seulement)
-router.put('/:id', updateUserValidation, async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
-    const { username, email, full_name, role } = req.body;
-    
-    // Vérifier si l'utilisateur existe
-    const [existingUser] = await pool.query('SELECT id FROM users WHERE id = ?', [req.params.id]);
-    if (existingUser.length === 0) {
-      return res.status(404).json({ error: 'Utilisateur non trouvé' });
-    }
-    
-    // Vérifier si le nouveau nom d'utilisateur ou email est déjà utilisé
-    if (username || email) {
-      const [duplicateUsers] = await pool.query(
-        'SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?',
-        [username || '', email || '', req.params.id]
-      );
-      if (duplicateUsers.length > 0) {
-        return res.status(400).json({ error: 'Nom d\'utilisateur ou email déjà utilisé' });
+  } catch (error) {
+    console.error('Erreur lors de la récupération des utilisateurs:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la récupération des utilisateurs',
+        code: 'INTERNAL_ERROR'
       }
-    }
-    
-    // Construire la requête de mise à jour
-    const updateFields = [];
-    const updateValues = [];
-    
-    if (username) {
-      updateFields.push('username = ?');
-      updateValues.push(username);
-    }
-    if (email) {
-      updateFields.push('email = ?');
-      updateValues.push(email);
-    }
-    if (full_name) {
-      updateFields.push('full_name = ?');
-      updateValues.push(full_name);
-    }
-    if (role) {
-      updateFields.push('role = ?');
-      updateValues.push(role);
-    }
-    
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'Aucun champ à mettre à jour' });
-    }
-    
-    updateValues.push(req.params.id);
-    
-    const [result] = await pool.query(
-      `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`,
-      updateValues
-    );
-    
-    await logAudit({
-      entity: 'users',
-      entityId: req.params.id,
-      action: 'update',
-      userId: req.user.id,
-      details: req.body
     });
-    
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Erreur modification utilisateur:', err);
-    res.status(500).json({ error: err.message });
   }
-});
+}));
 
-// DELETE /api/users/:id - Supprimer un utilisateur (admin seulement)
-router.delete('/:id', async (req, res) => {
+// GET /api/users/:id - Récupérer un utilisateur par ID
+router.get('/:id', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
+  const userId = parseInt(req.params.id);
+  
   try {
-    // Empêcher la suppression de son propre compte
-    if (parseInt(req.params.id) === req.user.id) {
-      return res.status(400).json({ error: 'Vous ne pouvez pas supprimer votre propre compte' });
+    const user = await UserService.getUserById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'Utilisateur non trouvé',
+          code: 'USER_NOT_FOUND'
+        }
+      });
     }
     
-    const [result] = await pool.query('DELETE FROM users WHERE id = ?', [req.params.id]);
+    // Ne pas renvoyer le mot de passe
+    delete user.password;
     
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Utilisateur non trouvé' });
-    }
-    
-    await logAudit({
-      entity: 'users',
-      entityId: req.params.id,
-      action: 'delete',
-      userId: req.user.id,
-      details: {}
+    res.json({
+      success: true,
+      data: user
     });
-    
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Erreur suppression utilisateur:', err);
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'utilisateur:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la récupération de l\'utilisateur',
+        code: 'INTERNAL_ERROR'
+      }
+    });
   }
-});
+}));
 
-export default router;
+// PUT /api/users/:id - Mettre à jour un utilisateur
+router.put('/:id', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
+  const userId = parseInt(req.params.id);
+  const updateData = req.body;
+  
+  try {
+    // Ne pas permettre la mise à jour du mot de passe via cette route
+    delete updateData.password;
+    
+    const updatedUser = await UserService.updateUser(userId, updateData);
+    
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'Utilisateur non trouvé',
+          code: 'USER_NOT_FOUND'
+        }
+      });
+    }
+    
+    // Ne pas renvoyer le mot de passe
+    delete updatedUser.password;
+    
+    res.json({
+      success: true,
+      message: 'Utilisateur mis à jour avec succès',
+      data: updatedUser
+    });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la mise à jour de l\'utilisateur',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+// DELETE /api/users/:id - Supprimer un utilisateur
+router.delete('/:id', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
+  const userId = parseInt(req.params.id);
+  
+  try {
+    await UserService.deleteUser(userId);
+    
+    res.json({
+      success: true,
+      message: 'Utilisateur supprimé avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur lors de la suppression de l\'utilisateur:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la suppression de l\'utilisateur',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+// GET /api/users/profile - Profil de l'utilisateur connecté
+router.get('/profile/me', authenticateUser, asyncHandler(async (req, res) => {
+  try {
+    const user = await UserService.getUserById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'Utilisateur non trouvé',
+          code: 'USER_NOT_FOUND'
+        }
+      });
+    }
+    
+    // Ne pas renvoyer le mot de passe
+    delete user.password;
+    
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération du profil:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la récupération du profil',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+// PUT /api/users/profile/me - Mettre à jour le profil de l'utilisateur connecté
+router.put('/profile/me', authenticateUser, asyncHandler(async (req, res) => {
+  const updateData = req.body;
+  
+  try {
+    // Ne pas permettre la mise à jour du mot de passe via cette route
+    delete updateData.password;
+    delete updateData.role;
+    
+    const updatedUser = await UserService.updateUser(req.user.id, updateData);
+    
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'Utilisateur non trouvé',
+          code: 'USER_NOT_FOUND'
+        }
+      });
+    }
+    
+    // Ne pas renvoyer le mot de passe
+    delete updatedUser.password;
+    
+    res.json({
+      success: true,
+      message: 'Profil mis à jour avec succès',
+      data: updatedUser
+    });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du profil:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la mise à jour du profil',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+export default router; 

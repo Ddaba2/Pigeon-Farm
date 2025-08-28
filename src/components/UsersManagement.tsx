@@ -29,11 +29,19 @@ function UsersManagement() {
     setError(null);
     
     try {
-      const data = await api.getUsers();
-      if (Array.isArray(data)) {
-        setUsers(data);
+      const response = await api.getUsers();
+      if (response && response.success && response.data) {
+        if (Array.isArray(response.data.users)) {
+          setUsers(response.data.users);
+        } else if (response.data.users === undefined || response.data.users === null) {
+          // Pas d'utilisateurs encore, c'est normal
+          setUsers([]);
+        } else {
+          console.warn('Structure de données inattendue:', response);
+          setUsers([]);
+        }
       } else {
-        console.warn('Données d\'utilisateurs invalides:', data);
+        console.warn('Données d\'utilisateurs invalides:', response);
         setUsers([]);
       }
     } catch (err: any) {

@@ -16,23 +16,11 @@ const getBaseURL = () => {
 
 const API_BASE_URL = getBaseURL();
 
-// Configuration des headers par défaut
+// Configuration des headers par défaut - SANS AUTHENTIFICATION
 const getDefaultHeaders = () => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-
-  // Ajouter le token d'authentification si disponible
-  const token = safeLocalStorage.getItem('token');
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  // Ajouter le token CSRF si disponible
-  const csrfToken = safeLocalStorage.getItem('csrfToken');
-  if (csrfToken) {
-    headers['X-CSRF-Token'] = csrfToken;
-  }
 
   return headers;
 };
@@ -99,16 +87,16 @@ export const apiRequest = async (
   }
 };
 
-// Fonctions API spécifiques
+// Fonctions API spécifiques - SANS AUTHENTIFICATION
 export const api = {
-  // Authentification
+  // Authentification simplifiée (sans JWT)
   login: (credentials: { username: string; password: string }) =>
     apiRequest('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     }),
 
-  register: (userData: { username: string; email: string; password: string }) =>
+  register: (userData: { username: string; email: string; password: string; fullName: string; acceptTerms: boolean }) =>
     apiRequest('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
@@ -121,19 +109,19 @@ export const api = {
 
   // Méthodes d'authentification supplémentaires
   forgotPassword: (data: { email: string }) =>
-    apiRequest('/api/auth/forgot-password', {
+    apiRequest('/api/forgot-password', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   verifyResetCode: (data: { email: string; code: string }) =>
-    apiRequest('/api/auth/verify-reset-code', {
+    apiRequest('/api/verify-reset-code', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   resetPassword: (data: { email: string; code: string; newPassword: string }) =>
-    apiRequest('/api/auth/reset-password', {
+    apiRequest('/api/reset-password', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -154,9 +142,6 @@ export const api = {
     apiRequest('/api/auth/verify', {
       method: 'GET',
     }),
-
-  // CSRF
-  getCSRFToken: () => apiRequest('/api/csrf-token'),
 
   // Profil utilisateur
   getProfile: () => apiRequest('/api/users/me'),
@@ -222,19 +207,19 @@ export const api = {
     }),
 
   // Santé - Correction de la route
-  getHealthRecords: () => apiRequest('/api/healthRecords'),
+  getHealthRecords: () => apiRequest('/api/health-records'),
   createHealthRecord: (healthData: any) =>
-    apiRequest('/api/healthRecords', {
+    apiRequest('/api/health-records', {
       method: 'POST',
       body: JSON.stringify(healthData),
     }),
   updateHealthRecord: (id: number, healthData: any) =>
-    apiRequest(`/api/healthRecords/${id}`, {
+    apiRequest(`/api/health-records/${id}`, {
       method: 'PUT',
       body: JSON.stringify(healthData),
     }),
   deleteHealthRecord: (id: number) =>
-    apiRequest(`/api/healthRecords/${id}`, {
+    apiRequest(`/api/health-records/${id}`, {
       method: 'DELETE',
     }),
 
@@ -280,23 +265,9 @@ export const api = {
       method: 'POST',
     }),
   restoreBackup: (backupData: any) =>
-    apiRequest('/api/backup/restore', {
+    apiRequest(`/api/backup/restore`, {
       method: 'POST',
       body: JSON.stringify(backupData),
-    }),
-
-  // Notifications
-  getNotifications: () => apiRequest('/api/notifications'),
-  markNotificationAsRead: (id: number) =>
-    apiRequest(`/api/notifications/${id}/read`, {
-      method: 'PUT',
-    }),
-
-  // Audit
-  getAuditLogs: (filters?: any) =>
-    apiRequest('/api/audit-logs', {
-      method: 'POST',
-      body: JSON.stringify(filters || {}),
     }),
 
   // Santé du serveur
@@ -319,6 +290,7 @@ export const testConnectivity = async () => {
 export const initializeAPI = async () => {
   console.log('🌐 Initialisation de l\'API...');
   console.log('📍 URL de base:', API_BASE_URL);
+  console.log('🔓 Mode: AUTHENTIFICATION DÉSACTIVÉE');
   
   const isConnected = await testConnectivity();
   

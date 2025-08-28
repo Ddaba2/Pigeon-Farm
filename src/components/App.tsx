@@ -25,11 +25,15 @@ function App() {
   const { isDark, toggleDark } = useDarkMode();
 
   useEffect(() => {
-    const token = safeLocalStorage.getItem('token');
-    if (token) {
-      // Vérifier si le token est valide
-      // Pour l'instant, on simule un utilisateur connecté
-      setUser({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
+    const userData = safeLocalStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        setUser(user);
+      } catch (error) {
+        console.error('Erreur lors du parsing des données utilisateur:', error);
+        safeLocalStorage.removeItem('user');
+      }
     }
   }, []);
 
@@ -42,7 +46,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    safeLocalStorage.removeItem('token');
+    safeLocalStorage.removeItem('user');
     setUser(null);
     setActiveTab('dashboard');
   };

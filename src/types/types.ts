@@ -11,15 +11,17 @@ export interface User {
 
 export interface Couple {
   id: number;
-  nestNumber: number;
-  race: string;
-  formationDate: string;
-  maleId: number;
-  femaleId: number;
-  observations: string;
-  status: 'active' | 'inactive' | 'breeding';
-  userId: number;
-  createdAt: string;
+  name: string;           // Nom du couple
+  breed: string;          // Race
+  date_formation?: string; // Date de formation
+  male: string;           // Nom du mâle
+  female: string;         // Nom de la femelle
+  status: 'actif' | 'inactif' | 'reproduction';
+  color?: string;         // Couleur (optionnel)
+  notes?: string;         // Observations
+  user_id: number;        // ID de l'utilisateur propriétaire
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Egg {
@@ -118,14 +120,7 @@ export interface MonthlyStat {
   sales: number;
 }
 
-// Types pour les notifications
-export interface Notification {
-  id: number;
-  message: string;
-  type: 'success' | 'error' | 'info' | 'warning';
-  createdAt: string;
-  read: boolean;
-}
+// Types pour les notifications supprimés
 
 // Types pour les ventes
 export interface Sale {

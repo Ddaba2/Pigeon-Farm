@@ -1,99 +1,166 @@
 import express from 'express';
-import pool from '../config/database.js';
+import { authenticateUser, requireUserOrAdmin } from '../middleware/auth.js';
+import { asyncHandler } from '../utils/errorHandler.js';
+import EggService from '../services/eggService.js';
+
 const router = express.Router();
 
-// GET /api/eggs - Récupérer tous les œufs de l'utilisateur connecté
-router.get('/', async (req, res) => {
+// GET /api/eggs - Récupérer tous les enregistrements d'œufs
+router.get('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const { coupleId, success, page = 1, limit = 10 } = req.query;
+  const userId = req.user.id;
+  
   try {
-    const userId = req.user.id;
-    const [rows] = await pool.query('SELECT * FROM eggs WHERE userId = ? ORDER BY createdAt DESC', [userId]);
-    res.json(rows);
-  } catch (err) {
-    console.error('Erreur récupération œufs:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/eggs/:id - Récupérer un œuf spécifique de l'utilisateur connecté
-router.get('/:id', async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const [rows] = await pool.query('SELECT * FROM eggs WHERE id = ? AND userId = ?', [req.params.id, userId]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Œuf non trouvé' });
-    res.json(rows[0]);
-  } catch (err) {
-    console.error('Erreur récupération œuf:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/eggs - Créer un nouvel œuf pour l'utilisateur connecté
-router.post('/', async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations } = req.body;
+    const filters = {};
+    if (coupleId) filters.coupleId = coupleId;
+    if (success !== undefined) filters.success = success === 'true';
     
-    // Vérifier que le couple appartient à l'utilisateur
-    const [couples] = await pool.query('SELECT id FROM couples WHERE id = ? AND userId = ?', [coupleId, userId]);
-    if (couples.length === 0) {
-      return res.status(400).json({ error: 'Couple non trouvé ou non autorisé' });
+    const result = await EggService.getEggsByUserId(userId, parseInt(page), parseInt(limit), filters);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération des œufs:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la récupération des œufs',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+// GET /api/eggs/:id - Récupérer un enregistrement d'œufs par ID
+router.get('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const eggId = parseInt(req.params.id);
+  
+  try {
+    const egg = await EggService.getEggById(eggId);
+    
+    if (!egg) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'Enregistrement d\'œufs non trouvé',
+          code: 'EGG_NOT_FOUND'
+        }
+      });
     }
     
-    const [result] = await pool.query(
-      'INSERT INTO eggs (coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, userId]
-    );
-    
-    res.status(201).json({ id: result.insertId });
-  } catch (err) {
-    console.error('Erreur création œuf:', err);
-    res.status(500).json({ error: err.message });
+    res.json({
+      success: true,
+      data: egg
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'œuf:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la récupération de l\'œuf',
+        code: 'INTERNAL_ERROR'
+      }
+    });
   }
-});
+}));
 
-// PUT /api/eggs/:id - Modifier un œuf de l'utilisateur connecté
-router.put('/:id', async (req, res) => {
+// POST /api/eggs - Créer un nouvel enregistrement d'œufs
+router.post('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const eggData = req.body;
+  
   try {
-    const userId = req.user.id;
-    const { coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations } = req.body;
+    // Créer le nouvel enregistrement
+    const newEgg = await EggService.createEgg(eggData);
     
-    // Vérifier que le couple appartient à l'utilisateur
-    const [couples] = await pool.query('SELECT id FROM couples WHERE id = ? AND userId = ?', [coupleId, userId]);
-    if (couples.length === 0) {
-      return res.status(400).json({ error: 'Couple non trouvé ou non autorisé' });
-    }
-    
-    const [result] = await pool.query(
-      'UPDATE eggs SET coupleId = ?, egg1Date = ?, egg2Date = ?, hatchDate1 = ?, hatchDate2 = ?, success1 = ?, success2 = ?, observations = ? WHERE id = ? AND userId = ?',
-      [coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, req.params.id, userId]
-    );
-    
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Œuf non trouvé' });
-    }
-    
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Erreur modification œuf:', err);
-    res.status(500).json({ error: err.message });
+    res.status(201).json({
+      success: true,
+      message: 'Enregistrement d\'œufs créé avec succès',
+      data: newEgg
+    });
+  } catch (error) {
+    console.error('Erreur lors de la création de l\'enregistrement d\'œufs:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la création de l\'enregistrement d\'œufs',
+        code: 'INTERNAL_ERROR'
+      }
+    });
   }
-});
+}));
 
-// DELETE /api/eggs/:id - Supprimer un œuf de l'utilisateur connecté
-router.delete('/:id', async (req, res) => {
+// PUT /api/eggs/:id - Mettre à jour un enregistrement d'œufs
+router.put('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const eggId = parseInt(req.params.id);
+  const updateData = req.body;
+  
   try {
-    const userId = req.user.id;
-    const [result] = await pool.query('DELETE FROM eggs WHERE id = ? AND userId = ?', [req.params.id, userId]);
+    // Mettre à jour l'enregistrement
+    const updatedEgg = await EggService.updateEgg(eggId, updateData);
     
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Œuf non trouvé' });
-    }
-    
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Erreur suppression œuf:', err);
-    res.status(500).json({ error: err.message });
+    res.json({
+      success: true,
+      message: 'Enregistrement d\'œufs mis à jour avec succès',
+      data: updatedEgg
+    });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de l\'enregistrement d\'œufs:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la mise à jour de l\'enregistrement d\'œufs',
+        code: 'INTERNAL_ERROR'
+      }
+    });
   }
-});
+}));
 
-export default router;
+// DELETE /api/eggs/:id - Supprimer un enregistrement d'œufs
+router.delete('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const eggId = parseInt(req.params.id);
+  const userId = req.user.id;
+  
+  try {
+    // Supprimer l'enregistrement
+    await EggService.deleteEgg(eggId, userId);
+    
+    res.json({
+      success: true,
+      message: 'Enregistrement d\'œufs supprimé avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur lors de la suppression de l\'enregistrement d\'œufs:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la suppression de l\'enregistrement d\'œufs',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+// GET /api/eggs/stats/summary - Statistiques des œufs
+router.get('/stats/summary', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  try {
+    const stats = await EggService.getEggStats(req.user.id);
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération des statistiques:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la récupération des statistiques',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+export default router; 

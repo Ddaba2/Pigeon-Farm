@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../utils/api';
 import { TrendingUp, Users, Activity, Bell } from 'lucide-react';
-import { Statistics, Notification } from '../types/types';
+import { Statistics } from '../types/types';
 
 
 function Dashboard() {
 
   const [stats, setStats] = useState<Statistics | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  // Notifications supprimées
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -16,10 +16,7 @@ function Dashboard() {
     setError(null);
     
     try {
-      const [statsData, notifData] = await Promise.all([
-        api.getStatistics(),
-        api.getNotifications()
-      ]);
+      const statsData = await api.getStatistics();
       
       // Vérifier que les données sont valides
       if (statsData && typeof statsData === 'object') {
@@ -29,12 +26,7 @@ function Dashboard() {
         setStats(null);
       }
       
-      if (Array.isArray(notifData)) {
-        setNotifications(notifData);
-      } else {
-        console.warn('Données de notifications invalides:', notifData);
-        setNotifications([]);
-      }
+      // Notifications supprimées
     } catch (err: unknown) {
       console.error('Erreur lors du chargement des données:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
@@ -51,7 +43,7 @@ function Dashboard() {
       }
       
       setStats(null);
-      setNotifications([]);
+      // Notifications supprimées
     } finally {
       setLoading(false);
     }
@@ -190,40 +182,7 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Notifications récentes */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center">
-            <Bell className="h-5 w-5 text-gray-500 dark:text-gray-400 mr-2" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notifications récentes</h3>
-          </div>
-        </div>
-        <div className="p-6">
-          {notifications.length > 0 ? (
-            <div className="space-y-4">
-        {notifications.map((n) => (
-                <div key={n.id} className="flex items-start space-x-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className={`w-2 h-2 rounded-full mt-2 ${
-                    n.type === 'warning' ? 'bg-yellow-500' : 
-                    n.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
-                  }`}></div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900 dark:text-white">{n.message}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {new Date(n.createdAt).toLocaleString('fr-FR')}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Bell className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">Aucune notification récente</p>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Notifications supprimées */}
     </div>
   );
 }

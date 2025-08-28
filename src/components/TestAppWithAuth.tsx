@@ -16,7 +16,7 @@ import { AppData, User } from '../types/types';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useAccessibility } from '../hooks/useAccessibility';
 import { useKeyboardNavigation, createAppShortcuts } from '../hooks/useKeyboardNavigation';
-import { NotificationProvider } from './NotificationContext';
+// Notifications supprimées
 import { safeLocalStorage } from '../utils/edgeCompatibility';
 
 
@@ -35,17 +35,38 @@ const initialData: AppData = {
 function TestAppWithAuth() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [data, setData] = useState<AppData>(initialData);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isAccessibilityPanelOpen, setIsAccessibilityPanelOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const { preferences } = useAccessibility();
   
+  useEffect(() => {
+    const userData = safeLocalStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        setUser(user);
+      } catch (error) {
+        console.error('Erreur lors du parsing des données utilisateur:', error);
+        safeLocalStorage.removeItem('user');
+      }
+    }
+  }, []);
+
+  const handleAuthSuccess = (userData: User, message?: string) => {
+    setUser(userData);
+    if (message) {
+      setSuccessMessage(message);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    }
+  };
+
   const handleLogout = () => {
-    setCurrentUser(null);
+    safeLocalStorage.removeItem('user');
+    setUser(null);
     setActiveTab('dashboard');
-    safeLocalStorage.removeItem('token');
   };
 
   const handleAccessibilityToggle = () => {
@@ -77,8 +98,8 @@ function TestAppWithAuth() {
     }
   }, [data]);
 
-  if (!currentUser) {
-    return <TestLogin onAuthSuccess={(user, msg) => { setCurrentUser(user); if (msg) setSuccessMessage(msg); }} />;
+  if (!user) {
+    return <TestLogin onAuthSuccess={handleAuthSuccess} />;
   }
 
   const renderContent = () => {
@@ -98,7 +119,7 @@ function TestAppWithAuth() {
       case 'users':
         return <UsersManagement />;
       case 'backup':
-        return currentUser?.role === 'admin' ? <BackupRestore /> : null;
+        return user?.role === 'admin' ? <BackupRestore /> : null;
       case 'logs':
         return null;
       case 'help':
@@ -109,7 +130,6 @@ function TestAppWithAuth() {
   };
 
   return (
-    <NotificationProvider>
       <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 ${preferences.largeText ? 'large-text' : ''}`}>
         <a href="#main-content" className="skip-link">
           Aller au contenu principal
@@ -137,7 +157,7 @@ function TestAppWithAuth() {
               </div>
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {currentUser.username}
+                  {user.username}
                 </span>
                 <button
                   onClick={toggleDarkMode}
@@ -162,7 +182,7 @@ function TestAppWithAuth() {
           <Navigation 
             activeTab={activeTab} 
             setActiveTab={setActiveTab} 
-            userRole={currentUser.role} 
+            userRole={user.role} 
             onAccessibilityToggle={handleAccessibilityToggle}
           />
           <main id="main-content" className="mt-8" role="main" aria-label="Contenu principal">
@@ -175,7 +195,6 @@ function TestAppWithAuth() {
           onClose={() => setIsAccessibilityPanelOpen(false)} 
         />
       </div>
-    </NotificationProvider>
   );
 }
 

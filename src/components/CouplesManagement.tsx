@@ -13,13 +13,13 @@ function CouplesManagement() {
   const [filterStatus, setFilterStatus] = useState('all');
 
   const [formData, setFormData] = useState({
-    nestNumber: '',
-    race: '',
-    formationDate: '',
-    maleId: '',
-    femaleId: '',
-    observations: '',
-    status: 'active'
+    name: '',           // Nom du couple (au lieu de nestNumber)
+    breed: '',          // Race (correct)
+    date_formation: '', // Date de formation (au lieu de formationDate)
+    male: '',           // Nom du mâle (au lieu de maleId)
+    female: '',         // Nom de la femelle (au lieu de femaleId)
+    notes: '',          // Observations (au lieu de observations)
+    status: 'actif'     // Statut (correct)
   });
 
   useEffect(() => {
@@ -31,11 +31,19 @@ function CouplesManagement() {
     setError(null);
     
     try {
-      const data = await api.getCouples();
-      if (Array.isArray(data)) {
-        setCouples(data);
+      const response = await api.getCouples();
+      if (response && response.success && response.data) {
+        if (Array.isArray(response.data.couples)) {
+          setCouples(response.data.couples);
+        } else if (response.data.couples === undefined || response.data.couples === null) {
+          // Pas de couples encore, c'est normal
+          setCouples([]);
+        } else {
+          console.warn('Structure de données inattendue:', response);
+          setCouples([]);
+        }
       } else {
-        console.warn('Données de couples invalides:', data);
+        console.warn('Données de couples invalides:', response);
         setCouples([]);
       }
     } catch (err: any) {
@@ -62,13 +70,13 @@ function CouplesManagement() {
       setShowForm(false);
       setEditingId(null);
       setFormData({
-        nestNumber: '',
-        race: '',
-        formationDate: '',
-        maleId: '',
-        femaleId: '',
-        observations: '',
-        status: 'active'
+        name: '',
+        breed: '',
+        date_formation: '',
+        male: '',
+        female: '',
+        notes: '',
+        status: 'actif'
       });
       loadCouples();
     } catch (err: any) {
@@ -82,13 +90,13 @@ function CouplesManagement() {
   const handleEdit = (couple: Couple) => {
     setEditingId(couple.id);
     setFormData({
-      nestNumber: couple.nestNumber?.toString() || '',
-      race: couple.race || '',
-      formationDate: couple.formationDate || '',
-      maleId: couple.maleId?.toString() || '',
-      femaleId: couple.femaleId?.toString() || '',
-      observations: couple.observations || '',
-      status: couple.status || 'active'
+      name: couple.name || '',
+      breed: couple.breed || '',
+      date_formation: couple.date_formation || '',
+      male: couple.male || '',
+      female: couple.female || '',
+      notes: couple.notes || '',
+      status: couple.status || 'actif'
     });
     setShowForm(true);
   };
@@ -113,11 +121,11 @@ function CouplesManagement() {
   };
 
   const filteredCouples = couples.filter(couple => {
-    const matchesSearch = couple.nestNumber?.toString().includes(searchTerm) ||
-                         couple.race?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         couple.maleId?.toString().includes(searchTerm) ||
-                         couple.femaleId?.toString().includes(searchTerm) ||
-                         couple.observations?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = couple.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         couple.breed?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         couple.male?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         couple.female?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         couple.notes?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = filterStatus === 'all' || couple.status === filterStatus;
     
@@ -152,7 +160,7 @@ function CouplesManagement() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Rechercher par nid, race, ID..."
+            placeholder="Rechercher par nom, race, mâle, femelle..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -167,9 +175,9 @@ function CouplesManagement() {
             className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
           >
             <option value="all">Tous les statuts</option>
-            <option value="active">Actif</option>
-            <option value="inactive">Inactif</option>
-            <option value="breeding">En reproduction</option>
+            <option value="actif">Actif</option>
+            <option value="inactif">Inactif</option>
+            <option value="reproduction">En reproduction</option>
           </select>
         </div>
       </div>
@@ -192,27 +200,29 @@ function CouplesManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Numéro de Nid *
+                  Nom du Couple *
                 </label>
                 <input
-                  type="number"
-                  value={formData.nestNumber}
-                  onChange={(e) => setFormData({...formData, nestNumber: e.target.value})}
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
+                  placeholder="Ex: Couple A1, Couple Champion..."
                 />
               </div>
-              
+               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Race *
                 </label>
                 <input
                   type="text"
-                  value={formData.race}
-                  onChange={(e) => setFormData({...formData, race: e.target.value})}
+                  value={formData.breed}
+                  onChange={(e) => setFormData({...formData, breed: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
+                  placeholder="Ex: Racing Homer, Tumbler..."
                 />
               </div>
             </div>
@@ -224,8 +234,8 @@ function CouplesManagement() {
                 </label>
                 <input
                   type="date"
-                  value={formData.formationDate}
-                  onChange={(e) => setFormData({...formData, formationDate: e.target.value})}
+                  value={formData.date_formation}
+                  onChange={(e) => setFormData({...formData, date_formation: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -239,9 +249,9 @@ function CouplesManagement() {
                   onChange={(e) => setFormData({...formData, status: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="active">Actif</option>
-                  <option value="inactive">Inactif</option>
-                  <option value="breeding">En reproduction</option>
+                  <option value="actif">Actif</option>
+                  <option value="inactif">Inactif</option>
+                  <option value="reproduction">En reproduction</option>
                 </select>
               </div>
             </div>
@@ -249,27 +259,29 @@ function CouplesManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  ID Mâle *
+                  Nom du Mâle *
                 </label>
                 <input
-                  type="number"
-                  value={formData.maleId}
-                  onChange={(e) => setFormData({...formData, maleId: e.target.value})}
+                  type="text"
+                  value={formData.male}
+                  onChange={(e) => setFormData({...formData, male: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
+                  placeholder="Ex: Champion, Speed..."
                 />
               </div>
-              
+               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  ID Femelle *
+                  Nom de la Femelle *
                 </label>
                 <input
-                  type="number"
-                  value={formData.femaleId}
-                  onChange={(e) => setFormData({...formData, femaleId: e.target.value})}
+                  type="text"
+                  value={formData.female}
+                  onChange={(e) => setFormData({...formData, female: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
+                  placeholder="Ex: Belle, Swift..."
                 />
               </div>
             </div>
@@ -279,8 +291,8 @@ function CouplesManagement() {
                 Observations
               </label>
               <textarea
-                value={formData.observations}
-                onChange={(e) => setFormData({...formData, observations: e.target.value})}
+                value={formData.notes}
+                onChange={(e) => setFormData({...formData, notes: e.target.value})}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Observations sur le couple..."
@@ -301,13 +313,13 @@ function CouplesManagement() {
                   setShowForm(false);
                   setEditingId(null);
                   setFormData({
-                    nestNumber: '',
-                    race: '',
-                    formationDate: '',
-                    maleId: '',
-                    femaleId: '',
-                    observations: '',
-                    status: 'active'
+                    name: '',
+                    breed: '',
+                    date_formation: '',
+                    male: '',
+                    female: '',
+                    notes: '',
+                    status: 'actif'
                   });
                 }}
                 className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
@@ -326,7 +338,7 @@ function CouplesManagement() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nid
+                  Nom
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Race
@@ -352,29 +364,29 @@ function CouplesManagement() {
               {filteredCouples.map((couple) => (
                 <tr key={couple.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {couple.nestNumber}
+                    {couple.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {couple.race}
+                    {couple.breed}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {couple.maleId}
+                    {couple.male}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {couple.femaleId}
+                    {couple.female}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {couple.formationDate ? new Date(couple.formationDate).toLocaleDateString() : '-'}
+                    {couple.date_formation ? new Date(couple.date_formation).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      couple.status === 'active' ? 'bg-green-100 text-green-800' :
-                      couple.status === 'breeding' ? 'bg-blue-100 text-blue-800' :
+                      couple.status === 'actif' ? 'bg-green-100 text-green-800' :
+                      couple.status === 'reproduction' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {couple.status === 'active' ? 'Actif' :
-                       couple.status === 'breeding' ? 'En reproduction' :
-                       couple.status === 'inactive' ? 'Inactif' : couple.status}
+                      {couple.status === 'actif' ? 'Actif' :
+                       couple.status === 'reproduction' ? 'En reproduction' :
+                       couple.status === 'inactif' ? 'Inactif' : couple.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

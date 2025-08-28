@@ -31,11 +31,19 @@ function HealthTracking() {
     setError(null);
     
     try {
-      const data = await api.getHealthRecords();
-      if (Array.isArray(data)) {
-        setHealthRecords(data);
+      const response = await api.getHealthRecords();
+      if (response && response.success && response.data) {
+        if (Array.isArray(response.data.healthRecords)) {
+          setHealthRecords(response.data.healthRecords);
+        } else if (response.data.healthRecords === undefined || response.data.healthRecords === null) {
+          // Pas d'enregistrements encore, c'est normal
+          setHealthRecords([]);
+        } else {
+          console.warn('Structure de données inattendue:', response);
+          setHealthRecords([]);
+        }
       } else {
-        console.warn('Données de santé invalides:', data);
+        console.warn('Données de santé invalides:', response);
         setHealthRecords([]);
       }
     } catch (err: any) {

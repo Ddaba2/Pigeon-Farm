@@ -1,110 +1,163 @@
 import express from 'express';
-import pool from '../config/database.js';
-import { logAudit } from '../utils/audit.js';
+import { authenticateUser, requireUserOrAdmin } from '../middleware/auth.js';
+import { asyncHandler } from '../utils/errorHandler.js';
+import PigeonneauService from '../services/pigeonneauService.js';
+
 const router = express.Router();
 
-// GET all pigeonneaux with couple info (filtré par userId)
-router.get('/', async (req, res) => {
+// GET /api/pigeonneaux - Récupérer tous les pigeonneaux
+router.get('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const { coupleId, status, page = 1, limit = 10 } = req.query;
+  const userId = req.user.id;
+  
   try {
-    const userId = req.user.id;
-    const [rows] = await pool.query(`
-      SELECT p.*, c.nestNumber, c.race
-      FROM pigeonneaux p
-      LEFT JOIN couples c ON p.coupleId = c.id
-      WHERE p.userId = ?
-    `, [userId]);
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Une erreur est survenue, veuillez réessayer.' });
-  }
-});
-
-// GET one pigeonneau by id (filtré par userId)
-router.get('/:id', async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const [rows] = await pool.query('SELECT * FROM pigeonneaux WHERE id = ? AND userId = ?', [req.params.id, userId]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Ressource non trouvée.' });
-    res.json(rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Une erreur est survenue, veuillez réessayer.' });
-  }
-});
-
-// POST create pigeonneau (avec vérification des relations et userId)
-router.post('/', async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { coupleId, eggRecordId, birthDate, sex, status, salePrice, saleDate, buyer, observations } = req.body;
+    const filters = {};
+    if (coupleId) filters.coupleId = coupleId;
+    if (status) filters.status = status;
     
-    // Vérifier que le couple appartient à l'utilisateur
-    const [couples] = await pool.query('SELECT id FROM couples WHERE id = ? AND userId = ?', [coupleId, userId]);
-    if (couples.length === 0) {
-      return res.status(400).json({ error: 'Le couple sélectionné n\'existe pas ou ne vous appartient pas.' });
+    const result = await PigeonneauService.getPigeonneauxByUserId(userId, parseInt(page), parseInt(limit), filters);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération des pigeonneaux:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la récupération des pigeonneaux',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+// GET /api/pigeonneaux/:id - Récupérer un pigeonneau par ID
+router.get('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const pigeonneauId = parseInt(req.params.id);
+  
+  try {
+    const pigeonneau = await PigeonneauService.getPigeonneauById(pigeonneauId);
+    
+    if (!pigeonneau) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'Pigeonneau non trouvé',
+          code: 'PIGEONNEAU_NOT_FOUND'
+        }
+      });
     }
     
-    // Vérifier que l'œuf appartient à l'utilisateur
-    const [eggs] = await pool.query('SELECT id FROM eggs WHERE id = ? AND userId = ?', [eggRecordId, userId]);
-    let finalEggRecordId = eggRecordId;
-    if (eggs.length === 0) {
-      // Créer automatiquement une ponte pour ce couple
-      const [newEgg] = await pool.query(
-        'INSERT INTO eggs (coupleId, egg1Date, success1, userId) VALUES (?, ?, ?, ?)',
-        [coupleId, birthDate, true, userId]
-      );
-      finalEggRecordId = newEgg.insertId;
-    }
-    
-    // Créer le pigeonneau
-    const [result] = await pool.query(
-      'INSERT INTO pigeonneaux (coupleId, eggRecordId, birthDate, sex, status, salePrice, saleDate, buyer, observations, userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [coupleId, finalEggRecordId, birthDate, sex, status, salePrice, saleDate, buyer, observations, userId]
-    );
-    res.status(201).json({ id: result.insertId });
-  } catch (err) {
-    res.status(500).json({ error: 'Une erreur est survenue, veuillez réessayer.' });
+    res.json({
+      success: true,
+      data: pigeonneau
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération du pigeonneau:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la récupération du pigeonneau',
+        code: 'INTERNAL_ERROR'
+      }
+    });
   }
-});
+}));
 
-// PUT update pigeonneau (filtré par userId)
-router.put('/:id', async (req, res) => {
+// POST /api/pigeonneaux - Créer un nouveau pigeonneau
+router.post('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const pigeonneauData = req.body;
+  
   try {
-    const userId = req.user.id;
-    // Vérifier que le pigeonneau appartient à l'utilisateur
-    const [rows] = await pool.query('SELECT * FROM pigeonneaux WHERE id = ? AND userId = ?', [req.params.id, userId]);
-    if (rows.length === 0) return res.status(403).json({ error: 'Accès interdit.' });
+    const newPigeonneau = await PigeonneauService.createPigeonneau(pigeonneauData);
     
-    const { coupleId, birthDate, sex, weight, status, salePrice, weaningDate } = req.body;
-    
-    // Vérifier que le couple appartient à l'utilisateur
-    const [couples] = await pool.query('SELECT id FROM couples WHERE id = ? AND userId = ?', [coupleId, userId]);
-    if (couples.length === 0) {
-      return res.status(400).json({ error: 'Le couple sélectionné n\'existe pas ou ne vous appartient pas.' });
-    }
-    
-    await pool.query(
-      'UPDATE pigeonneaux SET coupleId=?, birthDate=?, sex=?, weight=?, status=?, salePrice=?, weaningDate=? WHERE id=? AND userId=?',
-      [coupleId, birthDate, sex, weight, status, salePrice, weaningDate, req.params.id, userId]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Une erreur est survenue, veuillez réessayer.' });
+    res.status(201).json({
+      success: true,
+      message: 'Pigeonneau créé avec succès',
+      data: newPigeonneau
+    });
+  } catch (error) {
+    console.error('Erreur lors de la création du pigeonneau:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la création du pigeonneau',
+        code: 'INTERNAL_ERROR'
+      }
+    });
   }
-});
+}));
 
-// DELETE pigeonneau (filtré par userId)
-router.delete('/:id', async (req, res) => {
+// PUT /api/pigeonneaux/:id - Mettre à jour un pigeonneau
+router.put('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const pigeonneauId = parseInt(req.params.id);
+  const updateData = req.body;
+  
   try {
-    const userId = req.user.id;
-    // Vérifier que le pigeonneau appartient à l'utilisateur
-    const [rows] = await pool.query('SELECT * FROM pigeonneaux WHERE id = ? AND userId = ?', [req.params.id, userId]);
-    if (rows.length === 0) return res.status(403).json({ error: 'Accès interdit.' });
+    const updatedPigeonneau = await PigeonneauService.updatePigeonneau(pigeonneauId, updateData);
     
-    await pool.query('DELETE FROM pigeonneaux WHERE id=? AND userId=?', [req.params.id, userId]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Une erreur est survenue, veuillez réessayer.' });
+    res.json({
+      success: true,
+      message: 'Pigeonneau mis à jour avec succès',
+      data: updatedPigeonneau
+    });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du pigeonneau:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la mise à jour du pigeonneau',
+        code: 'INTERNAL_ERROR'
+      }
+    });
   }
-});
+}));
 
-export default router;
+// DELETE /api/pigeonneaux/:id - Supprimer un pigeonneau
+router.delete('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  const pigeonneauId = parseInt(req.params.id);
+  const userId = req.user.id;
+  
+  try {
+    await PigeonneauService.deletePigeonneau(pigeonneauId, userId);
+    
+    res.json({
+      success: true,
+      message: 'Pigeonneau supprimé avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur lors de la suppression du pigeonneau:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la suppression du pigeonneau',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+// GET /api/pigeonneaux/stats/summary - Statistiques des pigeonneaux
+router.get('/stats/summary', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+  try {
+    const stats = await PigeonneauService.getPigeonneauStats(req.user.id);
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération des statistiques:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la récupération des statistiques',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+}));
+
+export default router; 

@@ -33,11 +33,19 @@ function PigeonnalManagement() {
     setError(null);
     
     try {
-      const data = await api.getPigeonneaux();
-      if (Array.isArray(data)) {
-        setPigeonneaux(data);
+      const response = await api.getPigeonneaux();
+      if (response && response.success && response.data) {
+        if (Array.isArray(response.data.pigeonneaux)) {
+          setPigeonneaux(response.data.pigeonneaux);
+        } else if (response.data.pigeonneaux === undefined || response.data.pigeonneaux === null) {
+          // Pas de pigeonneaux encore, c'est normal
+          setPigeonneaux([]);
+        } else {
+          console.warn('Structure de données inattendue:', response);
+          setPigeonneaux([]);
+        }
       } else {
-        console.warn('Données de pigeonneaux invalides:', data);
+        console.warn('Données de pigeonneaux invalides:', response);
         setPigeonneaux([]);
       }
     } catch (err: any) {

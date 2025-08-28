@@ -1,29 +1,7 @@
 import express from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
-import http from 'http';
-import { Server as SocketIOServer } from 'socket.io';
 import cookieParser from 'cookie-parser';
-
-// Routes
-import couplesRouter from './routes/couples.js';
-import eggsRouter from './routes/eggs.js';
-import pigeonneauxRouter from './routes/pigeonneaux.js';
-import healthRecordsRouter from './routes/healthRecords.js';
-import usersRouter from './routes/users.js';
-import authRouter from './routes/auth.js';
-import auditLogsRouter from './routes/auditLogs.js';
-import notificationsRouter, { setSocketIO as setNotificationsSocketIO } from './routes/notifications.js';
-import exportsRouter from './routes/exports.js';
-import backupRouter from './routes/backup.js';
-import statisticsRouter from './routes/statistics.js';
-import salesRouter from './routes/sales.js';
-
-// Middlewares
-import authenticateToken from './middleware/auth.js';
-import requireRole from './middleware/roles.js';
-
-// Middlewares de sécurité
+import { config } from './config/config.js';
 import {
   helmetConfig,
   rateLimiter,
@@ -31,119 +9,158 @@ import {
   securityLogger,
   basicSecurity
 } from './middleware/security.js';
+import { globalErrorHandler, notFoundHandler } from './utils/errorHandler.js';
+import { testDatabaseConnection } from './config/database.js';
 
-import {
-  getCSRFToken
-} from './middleware/csrf.js';
-
-dotenv.config();
+// Import des routes
+import authRouter from './routes/auth.js';
+import couplesRouter from './routes/couples.js';
+import passwordResetRouter from './routes/passwordReset.js';
+import eggsRouter from './routes/eggs.js';
+import pigeonneauxRouter from './routes/pigeonneaux.js';
+import healthRouter from './routes/health.js';
+import statisticsRouter from './routes/statistics.js';
+import usersRouter from './routes/users.js';
 
 const app = express();
-const port = process.env.PORT || 3002;
+const port = config.port;
 
 // Configuration CORS
 const corsOptions = {
   origin: [
-    'http://localhost:5173', 
-    'http://127.0.0.1:5173', 
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
     'http://localhost:3000'
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
-
-// Création du serveur HTTP
-const server = http.createServer(app);
-
-// Configuration Socket.io
-const io = new SocketIOServer(server, {
-  cors: corsOptions
-});
-
-// Gestion de la connexion Socket.io
-io.on('connection', (socket) => {
-  console.log('🔌 Client connecté à Socket.io');
-});
 
 // Configuration des middlewares
 app.use(cors(corsOptions));
 app.use(helmetConfig);
-// app.use(rateLimiter); // Désactivé temporairement pour le développement
+app.use(rateLimiter);
 app.use(securityLogger);
 app.use(basicSecurity);
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Route pour obtenir un token CSRF (sans authentification pour l'initialisation)
-app.get('/api/csrf-token', async (req, res) => {
-  // Générer un token temporaire pour l'initialisation
-  const crypto = await import('crypto');
-  const tempToken = crypto.randomBytes(32).toString('hex');
-  res.setHeader('X-CSRF-Token', tempToken);
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+// Middleware de logging des requêtes
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const method = req.method;
+  const url = req.url;
+  const ip = req.ip || req.connection.remoteAddress;
   
-  res.json({ 
-    csrfToken: tempToken,
-    expiresIn: 30 * 60 * 1000
-  });
+  console.log(`📥 [${timestamp}] ${method} ${url} - ${ip}`);
+  
+  // Ajouter un timestamp à la requête
+  req.requestTime = timestamp;
+  
+  next();
 });
 
-// Route pour obtenir un token CSRF authentifié
-app.get('/api/csrf-token/auth', authenticateToken, getCSRFToken);
-
-// Configuration des routes
-app.use('/api/couples', authenticateToken, couplesRouter);
-app.use('/api/eggs', authenticateToken, eggsRouter);
-app.use('/api/pigeonneaux', authenticateToken, pigeonneauxRouter);
-app.use('/api/health-records', authenticateToken, healthRecordsRouter);
-app.use('/api/users', authenticateToken, requireRole('admin'), usersRouter);
-app.use('/api/auth', authRateLimiter, authRouter);
-app.use('/api/audit-logs', authenticateToken, requireRole('admin'), auditLogsRouter);
-app.use('/api/notifications', authenticateToken, notificationsRouter);
-app.use('/api/exports', authenticateToken, exportsRouter);
-app.use('/api/backup', authenticateToken, requireRole('admin'), backupRouter);
-app.use('/api/statistics', authenticateToken, statisticsRouter);
-app.use('/api/sales', authenticateToken, salesRouter);
-
-// Configuration des notifications Socket.io
-setNotificationsSocketIO(io);
-
-// Route de test de connexion
+// Route de santé du serveur
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    protocol: req.protocol,
-    secure: req.secure
+  res.json({
+    success: true,
+    data: {
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: config.nodeEnv,
+      version: '1.0.0',
+      message: 'Serveur PigeonFarm opérationnel'
+    }
   });
 });
 
-// Test de connexion à la base de données
-const testDatabaseConnection = async () => {
-  try {
-    const db = await import('./db.js');
-    await db.default.query('SELECT 1');
-    console.log('✅ Connexion à la base de données réussie');
-  } catch (error) {
-    console.error('❌ Erreur de connexion à la base de données:', error.message);
-  }
-};
+// Route de test de connectivité
+app.get('/api/test', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      message: 'API PigeonFarm accessible',
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        auth: '/api/auth/*',
+        couples: '/api/couples/*',
+        passwordReset: '/api/forgot-password, /api/verify-reset-code, /api/reset-password',
+        eggs: '/api/eggs/*',
+        pigeonneaux: '/api/pigeonneaux/*',
+        health: '/api/health-records/*',
+        statistics: '/api/statistics/*',
+        users: '/api/users/*'
+      }
+    }
+  });
+});
+
+// Configuration des routes API
+app.use('/api/auth', authRateLimiter, authRouter);
+app.use('/api/couples', couplesRouter);
+app.use('/api/eggs', eggsRouter);
+app.use('/api/pigeonneaux', pigeonneauxRouter);
+app.use('/api/health-records', healthRouter);
+app.use('/api/statistics', statisticsRouter);
+app.use('/api/users', usersRouter);
+app.use('/api', passwordResetRouter);
+
+// Gestionnaire d'erreurs 404
+app.use(notFoundHandler);
+
+// Gestionnaire d'erreurs global
+app.use(globalErrorHandler);
+
+// Gestion des erreurs non capturées
+process.on('uncaughtException', (err) => {
+  console.error('❌ Erreur non capturée:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('❌ Promesse rejetée non gérée:', err);
+  process.exit(1);
+});
 
 // Démarrage du serveur
-const startServer = async () => {
-  await testDatabaseConnection();
+const server = app.listen(port, async () => {
+  console.log('🚀 Serveur PigeonFarm démarré !');
+  console.log(`📊 Mode: ${config.nodeEnv}`);
+  console.log(`🌐 URL: http://localhost:${port}`);
+  console.log(`🔒 Sécurité: Helmet, Rate Limiting, CORS configurés`);
+  console.log(`🔐 Authentification: Simple (sans JWT)`);
+  console.log(`📡 Routes disponibles:`);
+  console.log(`   - /api/health (santé du serveur)`);
+  console.log(`   - /api/test (test de connectivité)`);
+  console.log(`   - /api/auth/* (authentification simple)`);
+  console.log(`   - /api/couples/* (gestion des couples)`);
+  console.log(`   - /api/eggs (œufs - temporaire)`);
+  console.log(`   - /api/pigeonneaux (pigeonneaux - temporaire)`);
+  console.log(`   - /api/health-records (santé - temporaire)`);
+  console.log(`   - /api/statistics (statistiques - temporaire)`);
+  console.log(`   - /api/users (utilisateurs - temporaire)`);
+  console.log('');
+  console.log('💡 Utilisez npm run dev pour le développement avec rechargement automatique');
+  console.log('💡 Testez l\'API: http://localhost:3002/api/health');
+  console.log('');
   
-  server.listen(port, () => {
-    console.log(`🚀 Serveur HTTP démarré sur le port ${port}`);
-    console.log(`📊 Mode: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌐 URL: http://localhost:${port}`);
-  });
-};
-
-// Gestion des erreurs
-server.on('error', (error) => {
-  console.error('❌ Erreur serveur HTTP:', error);
+  // Test de connexion à la base de données
+  console.log('🗄️ Test de connexion à la base de données...');
+  try {
+    const dbConnected = await testDatabaseConnection();
+    if (dbConnected) {
+      console.log('✅ Base de données connectée - Mode production activé');
+    } else {
+      console.log('⚠️ Base de données non connectée - Mode démo activé');
+    }
+  } catch (error) {
+    console.log('⚠️ Erreur lors du test de connexion - Mode démo activé');
+  }
 });
 
 // Gestion de l'arrêt gracieux
@@ -151,14 +168,18 @@ const gracefulShutdown = (signal) => {
   console.log(`\n🛑 Arrêt du serveur (${signal})...`);
   
   server.close(() => {
-    console.log('✅ Serveur HTTP arrêté');
+    console.log('✅ Serveur arrêté gracieusement');
+    process.exit(0);
   });
   
-  process.exit(0);
+  // Force l'arrêt si le serveur ne s'arrête pas dans les 10 secondes
+  setTimeout(() => {
+    console.error('❌ Arrêt forcé du serveur');
+    process.exit(1);
+  }, 10000);
 };
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
-// Démarrage
-startServer();
+export default app; 

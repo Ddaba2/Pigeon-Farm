@@ -32,11 +32,19 @@ function EggTracking() {
     setError(null);
     
     try {
-      const data = await api.getEggs();
-      if (Array.isArray(data)) {
-        setEggs(data);
+      const response = await api.getEggs();
+      if (response && response.success && response.data) {
+        if (Array.isArray(response.data.eggs)) {
+          setEggs(response.data.eggs);
+        } else if (response.data.eggs === undefined || response.data.eggs === null) {
+          // Pas d'œufs encore, c'est normal
+          setEggs([]);
+        } else {
+          console.warn('Structure de données inattendue:', response);
+          setEggs([]);
+        }
       } else {
-        console.warn('Données d\'œufs invalides:', data);
+        console.warn('Données d\'œufs invalides:', response);
         setEggs([]);
       }
     } catch (err: any) {

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Calendar } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { safeLocalStorage } from '../utils/edgeCompatibility';
+import LegalModal from './LegalModal';
 
 interface LoginProps {
   onAuthSuccess: (user: any, message?: string) => void;
@@ -20,6 +21,15 @@ function Login({ onAuthSuccess }: LoginProps) {
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [legalModal, setLegalModal] = useState<{ isOpen: boolean; type: 'privacy' | 'terms' }>({
+    isOpen: false,
+    type: 'privacy'
+  });
+
+  const [forgotPasswordModal, setForgotPasswordModal] = useState<{ isOpen: boolean; step: 'email' | 'code' | 'new-password' }>({
+    isOpen: false,
+    step: 'email'
+  });
 
   // Form data
   const [formData, setFormData] = useState({
@@ -28,11 +38,30 @@ function Login({ onAuthSuccess }: LoginProps) {
     password: '',
     confirmPassword: '',
     fullName: '',
-    phone: '',
-    birthDate: ''
+    acceptTerms: false
   });
 
   const navigate = useNavigate();
+
+  const openLegalModal = (type: 'privacy' | 'terms') => {
+    setLegalModal({ isOpen: true, type });
+  };
+
+  const closeLegalModal = () => {
+    setLegalModal({ isOpen: false, type: 'privacy' });
+  };
+
+  const openForgotPasswordModal = () => {
+    setForgotPasswordModal({ isOpen: true, step: 'email' });
+  };
+
+  const closeForgotPasswordModal = () => {
+    setForgotPasswordModal({ isOpen: false, step: 'email' });
+  };
+
+  const goToForgotPasswordStep = (step: 'email' | 'code' | 'new-password') => {
+    setForgotPasswordModal(prev => ({ ...prev, step }));
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -47,7 +76,7 @@ function Login({ onAuthSuccess }: LoginProps) {
       return formData.username && formData.password;
     } else {
       return formData.username && formData.email && formData.password && 
-             formData.confirmPassword && formData.fullName;
+             formData.confirmPassword && formData.fullName && formData.acceptTerms;
     }
   };
 
@@ -62,8 +91,8 @@ function Login({ onAuthSuccess }: LoginProps) {
 
     try {
       await api.forgotPassword({ email: resetEmail });
-      setSuccess('Code de réinitialisation envoyé à votre email');
-      setForgotPasswordStep('code');
+      setSuccess('Code à 4 chiffres envoyé à votre email');
+      goToForgotPasswordStep('code');
     } catch (err: any) {
       setError(err.message || 'Erreur lors de l\'envoi du code');
     } finally {
@@ -72,8 +101,8 @@ function Login({ onAuthSuccess }: LoginProps) {
   };
 
   const handleVerifyResetCode = async () => {
-    if (!resetCode) {
-      setError('Veuillez entrer le code de réinitialisation');
+    if (!resetCode || resetCode.length !== 4) {
+      setError('Veuillez entrer le code à 4 chiffres');
       return;
     }
 
@@ -82,10 +111,10 @@ function Login({ onAuthSuccess }: LoginProps) {
 
     try {
       await api.verifyResetCode({ email: resetEmail, code: resetCode });
-      setSuccess('Code vérifié avec succès');
-      setForgotPasswordStep('new-password');
+      setSuccess('Code vérifié avec succès ! Créez votre nouveau mot de passe');
+      goToForgotPasswordStep('new-password');
     } catch (err: any) {
-      setError(err.message || 'Code invalide');
+      setError(err.message || 'Code invalide. Vérifiez votre email et réessayez');
     } finally {
       setIsLoading(false);
     }
@@ -94,6 +123,11 @@ function Login({ onAuthSuccess }: LoginProps) {
   const handleResetPassword = async () => {
     if (!newPassword || !confirmNewPassword) {
       setError('Veuillez remplir tous les champs');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères');
       return;
     }
 
@@ -111,14 +145,14 @@ function Login({ onAuthSuccess }: LoginProps) {
         code: resetCode, 
         newPassword 
       });
-      setSuccess('Mot de passe réinitialisé avec succès');
-      setForgotPasswordStep('email');
+      setSuccess('Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter');
+      closeForgotPasswordModal();
       setResetEmail('');
       setResetCode('');
       setNewPassword('');
       setConfirmNewPassword('');
     } catch (err: any) {
-      setError(err.message || 'Erreur lors de la réinitialisation');
+      setError(err.message || 'Erreur lors de la réinitialisation. Vérifiez votre code et réessayez');
     } finally {
       setIsLoading(false);
     }
@@ -142,38 +176,40 @@ function Login({ onAuthSuccess }: LoginProps) {
 
     try {
       if (isLogin) {
-        // Connexion
+        // Connexion simplifiée sans JWT
         const res = await api.login({
           username: formData.username,
           password: formData.password
-      });
+        });
 
-      if (res.token) {
-        safeLocalStorage.setItem('token', res.token);
+        if (res.user) {
+          // Stocker les informations utilisateur directement
+          safeLocalStorage.setItem('user', JSON.stringify(res.user));
           onAuthSuccess(res.user, 'Connexion réussie !');
         } else {
-          throw new Error('Token non reçu');
+          throw new Error('Informations utilisateur non reçues');
         }
       } else {
         // Inscription
         await api.register({
           username: formData.username,
           email: formData.email,
-          password: formData.password
+          password: formData.password,
+          fullName: formData.fullName,
+          acceptTerms: formData.acceptTerms
         });
 
-        // Connexion automatique après inscription
-        const res = await api.login({
-          username: formData.username,
-          password: formData.password
+        // Rediriger vers la page de connexion après inscription réussie
+        setSuccess('Inscription réussie ! Vous pouvez maintenant vous connecter.');
+        setIsLogin(true);
+        setFormData({
+          username: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+          fullName: '',
+          acceptTerms: false
         });
-
-        if (res.token) {
-          safeLocalStorage.setItem('token', res.token);
-          onAuthSuccess(res.user, 'Inscription réussie ! Vous êtes maintenant connecté.');
-        } else {
-          throw new Error('Token non reçu');
-        }
       }
     } catch (err: any) {
       console.error('Erreur d\'authentification:', err);
@@ -183,14 +219,7 @@ function Login({ onAuthSuccess }: LoginProps) {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    try {
-      // Redirection vers l'authentification Google
-      window.location.href = '/api/auth/google';
-    } catch (err: any) {
-      setError('Erreur lors de la connexion Google');
-    }
-  };
+  // Connexion Google supprimée
 
   const handleVerifyEmail = async () => {
     if (!formData.email) {
@@ -258,15 +287,38 @@ function Login({ onAuthSuccess }: LoginProps) {
     }
   }, [success]);
 
-  // Interface de mot de passe oublié
-  if (forgotPasswordStep !== 'email') {
+    // Interface de mot de passe oublié (toutes les étapes)
+  if (forgotPasswordStep === 'code' || forgotPasswordStep === 'new-password') {
   return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              {forgotPasswordStep === 'code' ? 'Code de réinitialisation' : 'Nouveau mot de passe'}
-            </h2>
+            {/* Logo */}
+            <div className="flex justify-center mb-4">
+              <img 
+                src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png" 
+                alt="PigeonFarm Logo" 
+                className="h-20 w-auto"
+              />
+            </div>
+            
+                         {/* Indicateur d'étapes */}
+             <div className="flex justify-center mb-6">
+               <div className="flex space-x-3">
+                 <div className={`w-3 h-3 rounded-full ${forgotPasswordStep === 'code' ? 'bg-indigo-600' : 'bg-gray-300'}`}></div>
+                 <div className={`w-3 h-3 rounded-full ${forgotPasswordStep === 'new-password' ? 'bg-indigo-600' : 'bg-gray-300'}`}></div>
+               </div>
+             </div>
+             
+             <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+               {forgotPasswordStep === 'code' ? '🔢 Code de réinitialisation' : '🔑 Nouveau mot de passe'}
+             </h2>
+             <p className="mt-2 text-center text-sm text-gray-600">
+               {forgotPasswordStep === 'code' 
+                 ? 'Entrez le code à 4 chiffres reçu par email' 
+                 : 'Créez votre nouveau mot de passe'
+               }
+             </p>
           </div>
 
             {error && (
@@ -281,126 +333,201 @@ function Login({ onAuthSuccess }: LoginProps) {
               </div>
             )}
 
-          <form className="mt-8 space-y-6" onSubmit={(e) => e.preventDefault()}>
-            {forgotPasswordStep === 'code' && (
-            <div>
-                <label htmlFor="resetCode" className="block text-sm font-medium text-gray-700">
-                  Code de réinitialisation
-              </label>
-                <input
-                  id="resetCode"
-                  name="resetCode"
-                  type="text"
-                  required
-                  value={resetCode}
-                  onChange={(e) => setResetCode(e.target.value)}
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder="Entrez le code reçu par email"
-                />
-                <button
-                  type="button"
-                  onClick={handleVerifyResetCode}
-                  disabled={isLoading}
-                  className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  {isLoading ? 'Vérification...' : 'Vérifier le code'}
-                </button>
-              </div>
-            )}
+                     <form className="mt-8 space-y-6" onSubmit={(e) => e.preventDefault()}>
+             {/* Étape 1: Saisie de l'email */}
+             {forgotPasswordStep === 'email' && (
+               <div className="space-y-6">
+                 <div>
+                   <label htmlFor="resetEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                     📧 Votre email
+                   </label>
+                   <input
+                     id="resetEmail"
+                     name="resetEmail"
+                     type="email"
+                     required
+                     value={resetEmail}
+                     onChange={(e) => setResetEmail(e.target.value)}
+                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                     placeholder="votre@email.com"
+                   />
+                 </div>
+                 
+                 <button
+                   type="button"
+                   onClick={handleForgotPassword}
+                   disabled={isLoading || !resetEmail}
+                   className="w-full py-3 px-4 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                 >
+                   {isLoading ? '📤 Envoi en cours...' : '📤 Envoyer le code'}
+                 </button>
+               </div>
+             )}
 
-            {forgotPasswordStep === 'new-password' && (
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
-                    Nouveau mot de passe
-                  </label>
-                  <div className="mt-1 relative">
+             {/* Étape 2: Saisie du code */}
+             {forgotPasswordStep === 'code' && (
+              <div className="space-y-6">
+                  <div>
+                    <label htmlFor="resetCode" className="block text-sm font-medium text-gray-700 mb-3 text-center">
+                      🔢 Code de réinitialisation (4 chiffres)
+                    </label>
                     <input
-                      id="newPassword"
-                      name="newPassword"
-                      type={showPassword ? 'text' : 'password'}
+                      id="resetCode"
+                      name="resetCode"
+                      type="text"
+                      maxLength={4}
+                      pattern="[0-9]{4}"
                       required
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm pr-10"
-                      placeholder="Nouveau mot de passe"
+                      value={resetCode}
+                      onChange={(e) => {
+                        // Ne permettre que les chiffres
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        setResetCode(value);
+                      }}
+                      className="w-full px-4 py-4 border-2 border-gray-300 rounded-lg text-center text-3xl font-bold tracking-widest focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                      placeholder="0000"
+                      style={{ letterSpacing: '0.5em' }}
                     />
+                    <p className="mt-3 text-sm text-gray-500 text-center">
+                      📧 Code envoyé à <strong className="text-indigo-600">{resetEmail}</strong>
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3">
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={handleVerifyResetCode}
+                      disabled={isLoading || resetCode.length !== 4}
+                      className="w-full py-3 px-4 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-                  <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-gray-700">
-                    Confirmer le mot de passe
-              </label>
-                  <div className="mt-1 relative">
-                <input
-                      id="confirmNewPassword"
-                      name="confirmNewPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                  required
-                      value={confirmNewPassword}
-                      onChange={(e) => setConfirmNewPassword(e.target.value)}
-                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm pr-10"
-                      placeholder="Confirmer le mot de passe"
-                    />
+                      {isLoading ? '🔍 Vérification...' : '✅ Vérifier le code'}
+                    </button>
+                    
+                    {/* Bouton pour renvoyer le code */}
                     <button
                       type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={handleForgotPassword}
+                      disabled={isLoading}
+                      className="w-full py-2 text-sm text-indigo-600 hover:text-indigo-800 disabled:opacity-50 transition-colors"
                     >
-                      {showConfirmPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
+                      🔄 Renvoyer le code
                     </button>
                   </div>
                 </div>
+              )}
 
-                <button
-                  type="button"
-                  onClick={handleResetPassword}
-                  disabled={isLoading}
-                  className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  {isLoading ? 'Réinitialisation...' : 'Réinitialiser le mot de passe'}
-                </button>
-              </div>
-            )}
+                         {forgotPasswordStep === 'new-password' && (
+               <div className="space-y-6">
+                 <div>
+                   <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                     🔑 Nouveau mot de passe
+                   </label>
+                   <div className="relative">
+                     <input
+                       id="newPassword"
+                       name="newPassword"
+                       type={showPassword ? 'text' : 'password'}
+                       required
+                       value={newPassword}
+                       onChange={(e) => setNewPassword(e.target.value)}
+                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors pr-12"
+                       placeholder="Minimum 6 caractères"
+                     />
+                     <button
+                       type="button"
+                       onClick={() => setShowPassword(!showPassword)}
+                       className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                     >
+                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                     </button>
+                   </div>
+                   {newPassword && newPassword.length < 6 && (
+                     <p className="mt-1 text-sm text-red-500">⚠️ Le mot de passe doit contenir au moins 6 caractères</p>
+                   )}
+                 </div>
 
-            <div className="text-center">
-            <button 
-                type="button"
-                onClick={() => {
-                  setForgotPasswordStep('email');
-                  setError(null);
-                  setSuccess(null);
-                }}
-                className="text-indigo-600 hover:text-indigo-500"
-              >
-                Retour à la connexion
-            </button>
-            </div>
+                 <div>
+                   <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                     🔒 Confirmer le mot de passe
+                   </label>
+                   <div className="relative">
+                     <input
+                       id="confirmNewPassword"
+                       name="confirmNewPassword"
+                       type={showConfirmPassword ? 'text' : 'password'}
+                       required
+                       value={confirmNewPassword}
+                       onChange={(e) => setConfirmNewPassword(e.target.value)}
+                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors pr-12"
+                       placeholder="Confirmez votre mot de passe"
+                     />
+                     <button
+                       type="button"
+                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                       className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                     >
+                       {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                     </button>
+                   </div>
+                   {confirmNewPassword && newPassword !== confirmNewPassword && (
+                     <p className="mt-1 text-sm text-red-500">⚠️ Les mots de passe ne correspondent pas</p>
+                   )}
+                 </div>
+
+                 <button
+                   type="button"
+                   onClick={handleResetPassword}
+                   disabled={isLoading || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword}
+                   className="w-full py-3 px-4 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                 >
+                   {isLoading ? '🔄 Réinitialisation...' : '✅ Réinitialiser le mot de passe'}
+                 </button>
+               </div>
+             )}
+
+                         <div className="text-center">
+             <button 
+                 type="button"
+                 onClick={() => {
+                   setForgotPasswordStep('email');
+                   setError(null);
+                   setSuccess(null);
+                   setResetEmail('');
+                   setResetCode('');
+                   setNewPassword('');
+                   setConfirmNewPassword('');
+                 }}
+                 className="text-indigo-600 hover:text-indigo-500"
+               >
+                 ← Retour à la connexion
+             </button>
+             </div>
           </form>
+        </div>
       </div>
-    </div>
-  );
+    );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {isLogin ? 'Connexion' : 'Inscription'}
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {isLogin ? 'Connectez-vous à votre compte' : 'Créez votre compte'}
-          </p>
-        </div>
+                 <div>
+           {/* Logo */}
+           <div className="flex justify-center mb-4">
+             <img 
+               src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png" 
+               alt="PigeonFarm Logo" 
+               className="h-20 w-auto"
+             />
+           </div>
+           
+           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+             {isLogin ? 'Connexion' : 'Inscription'}
+           </h2>
+           <p className="mt-2 text-center text-sm text-gray-600">
+             {isLogin ? 'Connectez-vous à votre compte' : 'Créez votre compte'}
+           </p>
+         </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -418,25 +545,6 @@ function Login({ onAuthSuccess }: LoginProps) {
           <div className="space-y-4">
             {!isLogin && (
               <>
-            <div>
-                  <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-                    Nom complet
-              </label>
-                  <div className="mt-1 relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-                      id="fullName"
-                      name="fullName"
-              type="text"
-                      required={!isLogin}
-                      value={formData.fullName}
-                      onChange={handleInputChange}
-                      className="appearance-none relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                      placeholder="Nom complet"
-                    />
-                  </div>
-                </div>
-
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                     Email
@@ -454,41 +562,6 @@ function Login({ onAuthSuccess }: LoginProps) {
                       placeholder="email@exemple.com"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                    Téléphone
-                  </label>
-                  <div className="mt-1 relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      className="appearance-none relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                      placeholder="+33 6 12 34 56 78"
-                    />
-                  </div>
-            </div>
-            
-            <div>
-                  <label htmlFor="birthDate" className="block text-sm font-medium text-gray-700">
-                    Date de naissance
-              </label>
-                  <div className="mt-1 relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-                      id="birthDate"
-                      name="birthDate"
-                      type="date"
-                      value={formData.birthDate}
-                      onChange={handleInputChange}
-                      className="appearance-none relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-            />
-            </div>
                 </div>
               </>
             )}
@@ -511,6 +584,29 @@ function Login({ onAuthSuccess }: LoginProps) {
             />
               </div>
             </div>
+
+            {!isLogin && (
+              <div>
+                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                  Nom complet *
+                </label>
+                <div className="mt-1 relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    id="fullName"
+                    name="fullName"
+                    type="text"
+                    required={!isLogin}
+                    value={formData.fullName}
+                    onChange={handleInputChange}
+                    className="appearance-none relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                    placeholder="Prénom et nom"
+                  />
+                </div>
+              </div>
+            )}
+
+            
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
@@ -538,33 +634,69 @@ function Login({ onAuthSuccess }: LoginProps) {
               </div>
             </div>
 
-            {!isLogin && (
-            <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                  Confirmer le mot de passe
-              </label>
-                <div className="mt-1 relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    required={!isLogin}
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    className="appearance-none relative block w-full pl-10 pr-10 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                    placeholder="Confirmer le mot de passe"
-            />
-                <button
-                  type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
-                  </button>
-            </div>
-              </div>
-            )}
+                         {!isLogin && (
+             <div>
+                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                   Confirmer le mot de passe
+               </label>
+                 <div className="mt-1 relative">
+                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+             <input
+                     id="confirmPassword"
+                     name="confirmPassword"
+                     type={showConfirmPassword ? 'text' : 'password'}
+                     required={!isLogin}
+                     value={formData.confirmPassword}
+                     onChange={handleInputChange}
+                     className="appearance-none relative block w-full pl-10 pr-10 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                     placeholder="Confirmer le mot de passe"
+             />
+                 <button
+                   type="button"
+                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                   >
+                     {showConfirmPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
+                   </button>
+             </div>
+               </div>
+             )}
+
+             {/* Case à cocher pour accepter les conditions - placée après la confirmation du mot de passe */}
+             {!isLogin && (
+               <div className="flex items-center">
+                 <input
+                   id="acceptTerms"
+                   name="acceptTerms"
+                   type="checkbox"
+                   checked={formData.acceptTerms}
+                   onChange={(e) => setFormData(prev => ({
+                     ...prev,
+                     acceptTerms: e.target.checked
+                   }))}
+                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                 />
+                 <label htmlFor="acceptTerms" className="ml-2 block text-sm text-gray-700">
+                   J'accepte la{' '}
+                   <button
+                     type="button"
+                     onClick={() => openLegalModal('privacy')}
+                     className="text-indigo-600 hover:text-indigo-500 underline bg-transparent border-none p-0 cursor-pointer"
+                   >
+                     politique d'utilisation
+                   </button>{' '}
+                   et les{' '}
+                   <button
+                     type="button"
+                     onClick={() => openLegalModal('terms')}
+                     className="text-indigo-600 hover:text-indigo-500 underline bg-transparent border-none p-0 cursor-pointer"
+                   >
+                     conditions générales
+                   </button>{' '}
+                   *
+                 </label>
+               </div>
+             )}
           </div>
 
           <div>
@@ -577,44 +709,23 @@ function Login({ onAuthSuccess }: LoginProps) {
             </button>
           </div>
 
-          {isLogin && (
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setForgotPasswordStep('email')}
-                className="text-sm text-indigo-600 hover:text-indigo-500"
-              >
-                Mot de passe oublié ?
-              </button>
-          </div>
-          )}
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">Ou continuer avec</span>
-              </div>
+                                           {isLogin && (
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={openForgotPasswordModal}
+                  className="text-sm text-indigo-600 hover:text-indigo-500"
+                >
+                  Mot de passe oublié ?
+                </button>
             </div>
+            )}
 
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                <span className="ml-2">Continuer avec Google</span>
-              </button>
-            </div>
-          </div>
+
+
+           
+
+          {/* Connexion Google supprimée */}
 
           <div className="text-center">
             <button
@@ -629,8 +740,7 @@ function Login({ onAuthSuccess }: LoginProps) {
                   password: '',
                   confirmPassword: '',
                   fullName: '',
-                  phone: '',
-                  birthDate: ''
+                  acceptTerms: false
                 });
               }}
               className="text-indigo-600 hover:text-indigo-500"
@@ -640,6 +750,223 @@ function Login({ onAuthSuccess }: LoginProps) {
           </div>
         </form>
       </div>
+
+             {/* Modal pour les pages légales */}
+       <LegalModal
+         isOpen={legalModal.isOpen}
+         onClose={closeLegalModal}
+         type={legalModal.type}
+       />
+
+       {/* Modal pour le mot de passe oublié */}
+       {forgotPasswordModal.isOpen && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+           <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+             <div className="p-6">
+               {/* Logo */}
+               <div className="flex justify-center mb-4">
+                 <img 
+                   src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png" 
+                   alt="PigeonFarm Logo" 
+                   className="h-16 w-auto"
+                 />
+               </div>
+
+               {/* Indicateur d'étapes */}
+               <div className="flex justify-center mb-6">
+                 <div className="flex space-x-3">
+                   <div className={`w-3 h-3 rounded-full ${forgotPasswordModal.step === 'email' ? 'bg-indigo-600' : 'bg-gray-300'}`}></div>
+                   <div className={`w-3 h-3 rounded-full ${forgotPasswordModal.step === 'code' ? 'bg-indigo-600' : 'bg-gray-300'}`}></div>
+                   <div className={`w-3 h-3 rounded-full ${forgotPasswordModal.step === 'new-password' ? 'bg-indigo-600' : 'bg-gray-300'}`}></div>
+                 </div>
+               </div>
+
+               {/* Titre et description */}
+               <div className="text-center mb-6">
+                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                   {forgotPasswordModal.step === 'email' ? '🔐 Mot de passe oublié ?' : 
+                    forgotPasswordModal.step === 'code' ? '🔢 Code de réinitialisation' : '🔑 Nouveau mot de passe'}
+                 </h2>
+                 <p className="text-sm text-gray-600">
+                   {forgotPasswordModal.step === 'email' ? 'Entrez votre email pour recevoir un code à 4 chiffres' :
+                    forgotPasswordModal.step === 'code' 
+                     ? 'Entrez le code à 4 chiffres reçu par email' 
+                     : 'Créez votre nouveau mot de passe'
+                   }
+                 </p>
+               </div>
+
+               {/* Messages d'erreur et de succès */}
+               {error && (
+                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+                   {error}
+                 </div>
+               )}
+
+               {success && (
+                 <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
+                   {success}
+                 </div>
+               )}
+
+               {/* Étape 1: Saisie de l'email */}
+               {forgotPasswordModal.step === 'email' && (
+                 <div className="space-y-4">
+                   <div>
+                     <label htmlFor="modalResetEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                       📧 Votre email
+                     </label>
+                     <input
+                       id="modalResetEmail"
+                       type="email"
+                       required
+                       value={resetEmail}
+                       onChange={(e) => setResetEmail(e.target.value)}
+                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                       placeholder="votre@email.com"
+                     />
+                   </div>
+                   
+                   <button
+                     type="button"
+                     onClick={handleForgotPassword}
+                     disabled={isLoading || !resetEmail}
+                     className="w-full py-3 px-4 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                   >
+                     {isLoading ? '📤 Envoi en cours...' : '📤 Envoyer le code'}
+                   </button>
+                 </div>
+               )}
+
+               {/* Étape 2: Saisie du code */}
+               {forgotPasswordModal.step === 'code' && (
+                 <div className="space-y-4">
+                   <div>
+                     <label htmlFor="modalResetCode" className="block text-sm font-medium text-gray-700 mb-2 text-center">
+                       🔢 Code de réinitialisation (4 chiffres)
+                     </label>
+                     <input
+                       id="modalResetCode"
+                       type="text"
+                       maxLength={4}
+                       pattern="[0-9]{4}"
+                       required
+                       value={resetCode}
+                       onChange={(e) => {
+                         const value = e.target.value.replace(/[^0-9]/g, '');
+                         setResetCode(value);
+                       }}
+                       className="w-full px-4 py-4 border-2 border-gray-300 rounded-lg text-center text-2xl font-bold tracking-widest focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                       placeholder="0000"
+                       style={{ letterSpacing: '0.5em' }}
+                     />
+                     <p className="text-sm text-gray-500 text-center mt-2">
+                       📧 Code envoyé à <strong className="text-indigo-600">{resetEmail}</strong>
+                     </p>
+                   </div>
+                   
+                   <button
+                     type="button"
+                     onClick={handleVerifyResetCode}
+                     disabled={isLoading || resetCode.length !== 4}
+                     className="w-full py-3 px-4 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                   >
+                     {isLoading ? '🔍 Vérification...' : '✅ Vérifier le code'}
+                   </button>
+                   
+                   <button
+                     type="button"
+                     onClick={handleForgotPassword}
+                     disabled={isLoading}
+                     className="w-full py-2 text-sm text-indigo-600 hover:text-indigo-800 disabled:opacity-50 transition-colors"
+                   >
+                     🔄 Renvoyer le code
+                   </button>
+                 </div>
+               )}
+
+               {/* Étape 3: Nouveau mot de passe */}
+               {forgotPasswordModal.step === 'new-password' && (
+                 <div className="space-y-4">
+                   <div>
+                     <label htmlFor="modalNewPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                       🔑 Nouveau mot de passe
+                     </label>
+                     <div className="relative">
+                       <input
+                         id="modalNewPassword"
+                         type={showPassword ? 'text' : 'password'}
+                         required
+                         value={newPassword}
+                         onChange={(e) => setNewPassword(e.target.value)}
+                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors pr-12"
+                         placeholder="Minimum 6 caractères"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => setShowPassword(!showPassword)}
+                         className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                       >
+                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                       </button>
+                     </div>
+                     {newPassword && newPassword.length < 6 && (
+                       <p className="text-sm text-red-500">⚠️ Le mot de passe doit contenir au moins 6 caractères</p>
+                     )}
+                   </div>
+
+                   <div>
+                     <label htmlFor="modalConfirmNewPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                       🔒 Confirmer le mot de passe
+                     </label>
+                     <div className="relative">
+                       <input
+                         id="modalConfirmNewPassword"
+                         type={showConfirmPassword ? 'text' : 'password'}
+                         required
+                         value={confirmNewPassword}
+                         onChange={(e) => setConfirmNewPassword(e.target.value)}
+                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors pr-12"
+                         placeholder="Confirmez votre mot de passe"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                         className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                       >
+                         {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                       </button>
+                     </div>
+                     {confirmNewPassword && newPassword !== confirmNewPassword && (
+                       <p className="text-sm text-red-500">⚠️ Les mots de passe ne correspondent pas</p>
+                     )}
+                   </div>
+
+                   <button
+                     type="button"
+                     onClick={handleResetPassword}
+                     disabled={isLoading || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword}
+                     className="w-full py-3 px-4 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                   >
+                     {isLoading ? '🔄 Réinitialisation...' : '✅ Réinitialiser le mot de passe'}
+                   </button>
+                 </div>
+               )}
+
+               {/* Bouton de fermeture */}
+               <div className="text-center mt-6">
+                 <button
+                   type="button"
+                   onClick={closeForgotPasswordModal}
+                   className="text-indigo-600 hover:text-indigo-500 text-sm"
+                 >
+                   ← Retour à la connexion
+                 </button>
+               </div>
+             </div>
+           </div>
+         </div>
+       )}
     </div>
   );
 }

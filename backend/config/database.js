@@ -1,33 +1,87 @@
 import mysql from 'mysql2/promise';
-import dotenv from 'dotenv';
+import { config } from './config.js';
 
-dotenv.config();
-
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'pigeonfarm',
-  port: process.env.DB_PORT || 3306,
+// Configuration de la connexion MySQL
+export const dbConfig = {
+  host: config.database.host,
+  user: config.database.user,
+  password: config.database.password,
+  database: config.database.name,
+  port: config.database.port,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true
-});
+  queueLimit: 0
+};
 
-// Test de connexion
-export const testConnection = async () => {
+// Création du pool de connexions
+export const pool = mysql.createPool(dbConfig);
+
+// Test de connexion à la base de données
+export const testDatabaseConnection = async () => {
   try {
     const connection = await pool.getConnection();
-    console.log('✅ Connexion à la base de données réussie');
+    console.log('✅ Connexion à MySQL réussie !');
+    console.log(`📊 Base de données: ${config.database.name}`);
+    console.log(`🌐 Hôte: ${config.database.host}:${config.database.port}`);
+    console.log(`👤 Utilisateur: ${config.database.user}`);
+    
+    // Test des tables principales
+    const [tables] = await connection.execute('SHOW TABLES');
+    console.log('📋 Tables disponibles:');
+    tables.forEach(table => {
+      const tableName = Object.values(table)[0];
+      console.log(`   - ${tableName}`);
+    });
+    
     connection.release();
     return true;
   } catch (error) {
-    console.error('❌ Erreur de connexion à la base de données:', error.message);
+    console.error('❌ Erreur de connexion à MySQL:', error.message);
+    console.log('💡 Vérifiez que:');
+    console.log('   1. MySQL est démarré');
+    console.log('   2. La base de données "pigeon_manager" existe');
+    console.log('   3. Les credentials sont corrects');
+    console.log('   4. Le port 3306 est accessible');
     return false;
   }
 };
 
-export default pool;
+// Fonction pour exécuter des requêtes
+export const executeQuery = async (sql, params = []) => {
+  try {
+    const [rows] = await pool.execute(sql, params);
+    return rows;
+  } catch (error) {
+    console.error('❌ Erreur d\'exécution de requête:', error.message);
+    throw error;
+  }
+};
+
+// Fonction pour exécuter des requêtes avec transaction
+export const executeTransaction = async (queries) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    
+    const results = [];
+    for (const query of queries) {
+      const [result] = await connection.execute(query.sql, query.params || []);
+      results.push(result);
+    }
+    
+    await connection.commit();
+    return results;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+export default {
+  pool,
+  testDatabaseConnection,
+  executeQuery,
+  executeTransaction
+}; 

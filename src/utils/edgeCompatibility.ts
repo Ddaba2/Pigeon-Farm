@@ -197,7 +197,7 @@ export function showEdgeWarning(): void {
   if (checkEdgeCompatibility()) {
     console.warn('⚠️ Navigateur Edge détecté - Certaines fonctionnalités peuvent être limitées');
     
-    // Créer une notification visuelle si nécessaire
+    // Notifications supprimées
     const warningDiv = document.createElement('div');
     warningDiv.style.cssText = `
       position: fixed;

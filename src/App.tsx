@@ -16,7 +16,7 @@ import { AppData, User } from './types/types';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useAccessibility } from './hooks/useAccessibility';
 import { useKeyboardNavigation, createAppShortcuts } from './hooks/useKeyboardNavigation';
-import { NotificationProvider } from './components/NotificationContext';
+// Notifications supprimées
 import { safeLocalStorage } from './utils/edgeCompatibility';
 
 const initialData: AppData = {
@@ -112,7 +112,6 @@ function App() {
   };
 
   return (
-    <NotificationProvider>
       <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 ${preferences.largeText ? 'large-text' : ''}`}>
         {/* Skip to main content link for screen readers */}
         <a href="#main-content" className="skip-link">
@@ -186,7 +185,6 @@ function App() {
           onClose={() => setIsAccessibilityPanelOpen(false)} 
         />
       </div>
-    </NotificationProvider>
   );
 }
 

@@ -21,7 +21,7 @@ export default defineConfig({
   },
   server: {
     host: true,
-    port: parseInt(process.env.VITE_PORT || '5173'),
+    port: parseInt(process.env.VITE_PORT || '5174'),
     strictPort: false,
     headers: {
       'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -29,17 +29,19 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:3002', // Proxy vers HTTP backend
+        target: process.env.VITE_API_URL || 'http://localhost:3002',
         changeOrigin: true,
+        secure: false,
+        ws: true,
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
-            console.log('proxy error', err);
+            console.log('❌ Erreur proxy:', err);
           });
           proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending Request to the Target:', req.method, req.url);
+            console.log('📤 Requête envoyée vers le backend:', req.method, req.url);
           });
           proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+            console.log('📥 Réponse reçue du backend:', proxyRes.statusCode, req.url);
           });
         },
       },
@@ -51,6 +53,9 @@ export default defineConfig({
     'global': 'globalThis',
     // Variables pour la compatibilité Edge
     'process.env.EDGE_COMPATIBILITY': JSON.stringify(process.env.EDGE_COMPATIBILITY || 'false'),
+    // Variables pour l'API
+    'process.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'http://localhost:3002'),
+    'process.env.VITE_API_PORT': JSON.stringify(process.env.VITE_API_PORT || '3002'),
   },
   // Configuration pour améliorer la compatibilité Edge
   esbuild: {
