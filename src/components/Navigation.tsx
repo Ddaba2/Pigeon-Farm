@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Users, FileText, Activity, Heart, TrendingUp, Settings, Accessibility } from 'lucide-react';
+import { BarChart3, Users, FileText, Activity, Heart, TrendingUp, FileText as FileTextIcon, Settings, Accessibility } from 'lucide-react';
 import { useAccessibility } from '../hooks/useAccessibility';
 
 interface NavigationProps {
@@ -8,8 +8,6 @@ interface NavigationProps {
   userRole: string;
   onAccessibilityToggle: () => void;
 }
-
-
 
 const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, userRole, onAccessibilityToggle }) => {
   const { preferences } = useAccessibility();
@@ -21,7 +19,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, userRo
     { id: 'pigeonneaux', label: 'Pigeonneaux', icon: Activity },
     { id: 'health', label: 'Santé', icon: Heart },
     { id: 'statistics', label: 'Statistiques', icon: TrendingUp },
-    ...(userRole === 'admin' ? [{ id: 'backup', label: 'Sauvegarde', icon: FileText }] : []),
+    ...(userRole === 'admin' ? [{ id: 'backup', label: 'Sauvegarde', icon: FileTextIcon }] : []),
     { id: 'help', label: 'Aide', icon: Settings },
   ];
   

@@ -1,305 +1,312 @@
-// Configuration de l'API avec compatibilité Edge
-import { safeLocalStorage } from './edgeCompatibility';
+// Configuration de l'API pour PigeonFarm
+const API_BASE_URL = 'http://localhost:3002/api';
 
-// Configuration de l'URL de base selon l'environnement
-const getBaseURL = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return 'http://api.pigeonfarm.com'; // URL de production
-  }
-  
-  // En développement, utiliser HTTP et le port 3002
-  const host = window.location.hostname;
-  const port = process.env.VITE_API_PORT || '3002';
-  
-  return `http://${host}:${port}`;
-};
+// Types pour les réponses API
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+}
 
-const API_BASE_URL = getBaseURL();
+// Classe principale pour les appels API
+class ApiClient {
+  private baseURL: string;
 
-// Configuration des headers par défaut - SANS AUTHENTIFICATION
-const getDefaultHeaders = () => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  return headers;
-};
-
-// Fonction pour gérer les erreurs de manière compatible avec Edge
-const handleError = (error: any, url: string) => {
-  console.error(`❌ Erreur API (${url}):`, error);
-  
-  // Gestion spécifique pour Edge
-  if (error.name === 'TypeError' && error.message.includes('fetch')) {
-    console.warn('⚠️ Problème de compatibilité Edge détecté');
-    return {
-      error: 'Problème de compatibilité avec le navigateur',
-      details: 'Veuillez utiliser un navigateur plus récent ou activer JavaScript'
-    };
-  }
-  
-  return {
-    error: error.message || 'Erreur de connexion',
-    details: error.toString()
-  };
-};
-
-// Fonction pour faire des requêtes API avec retry et compatibilité Edge
-export const apiRequest = async (
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<any> => {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const config: RequestInit = {
-    ...options,
-    headers: {
-      ...getDefaultHeaders(),
-      ...options.headers,
-    },
-    credentials: 'include', // Important pour les cookies de session
-  };
-
-  // Configuration spécifique pour Edge
-  if (process.env.EDGE_COMPATIBILITY === 'true') {
-    // Utiliser des options plus compatibles avec Edge
-    config.mode = 'cors';
-    config.cache = 'no-cache';
+  constructor(baseURL: string) {
+    this.baseURL = baseURL;
   }
 
-  try {
-    const response = await fetch(url, config);
-    
-    // Gérer les erreurs HTTP
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    try {
+      const url = `${this.baseURL}${endpoint}`;
+      const token = localStorage.getItem('token');
+      
+      const config: RequestInit = {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+          ...options.headers,
+        },
+        ...options,
+      };
+
+      const response = await fetch(url, config);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `Erreur HTTP: ${response.status}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Erreur API:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+      };
     }
-
-    // Vérifier le type de contenu
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return await response.json();
-    } else {
-      return await response.text();
-    }
-  } catch (error) {
-    return handleError(error, url);
   }
-};
 
-// Fonctions API spécifiques - SANS AUTHENTIFICATION
-export const api = {
-  // Authentification simplifiée (sans JWT)
-  login: (credentials: { username: string; password: string }) =>
-    apiRequest('/api/auth/login', {
+  // Méthodes pour les couples
+  async getCouples(): Promise<ApiResponse<any>> {
+    return this.request('/couples');
+  }
+
+  async createCouple(coupleData: any): Promise<ApiResponse<any>> {
+    return this.request('/couples', {
+      method: 'POST',
+      body: JSON.stringify(coupleData),
+    });
+  }
+
+  async updateCouple(id: number, coupleData: any): Promise<ApiResponse<any>> {
+    return this.request(`/couples/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(coupleData),
+    });
+  }
+
+  async deleteCouple(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/couples/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Méthodes pour les œufs
+  async getEggs(): Promise<ApiResponse<any>> {
+    return this.request('/eggs');
+  }
+
+  async createEgg(eggData: any): Promise<ApiResponse<any>> {
+    return this.request('/eggs', {
+      method: 'POST',
+      body: JSON.stringify(eggData),
+    });
+  }
+
+  async updateEgg(id: number, eggData: any): Promise<ApiResponse<any>> {
+    return this.request(`/eggs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(eggData),
+    });
+  }
+
+  async deleteEgg(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/eggs/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Méthodes pour les pigeonneaux
+  async getPigeonneaux(): Promise<ApiResponse<any>> {
+    return this.request('/pigeonneaux');
+  }
+
+  async createPigeonneau(pigeonneauData: any): Promise<ApiResponse<any>> {
+    return this.request('/pigeonneaux', {
+      method: 'POST',
+      body: JSON.stringify(pigeonneauData),
+    });
+  }
+
+  async updatePigeonneau(id: number, pigeonneauData: any): Promise<ApiResponse<any>> {
+    return this.request(`/pigeonneaux/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(pigeonneauData),
+    });
+  }
+
+  async deletePigeonneau(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/pigeonneaux/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Méthodes pour la santé
+  async getHealthRecords(): Promise<ApiResponse<any>> {
+    return this.request('/health');
+  }
+
+  async createHealthRecord(healthData: any): Promise<ApiResponse<any>> {
+    return this.request('/health', {
+      method: 'POST',
+      body: JSON.stringify(healthData),
+    });
+  }
+
+  async updateHealthRecord(id: number, healthData: any): Promise<ApiResponse<any>> {
+    return this.request(`/health/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(healthData),
+    });
+  }
+
+  async deleteHealthRecord(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/health/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Méthodes pour les statistiques
+  async getStatistics(): Promise<ApiResponse<any>> {
+    return this.request('/statistics');
+  }
+
+  async getStatisticsByPeriod(period: string): Promise<ApiResponse<any>> {
+    return this.request(`/statistics?period=${period}`);
+  }
+
+  // Méthodes pour le tableau de bord
+  async getDashboardData(): Promise<ApiResponse<any>> {
+    return this.request('/dashboard');
+  }
+
+  // Méthodes pour les utilisateurs
+  async getUsers(): Promise<ApiResponse<any>> {
+    return this.request('/users');
+  }
+
+  async createUser(userData: any): Promise<ApiResponse<any>> {
+    return this.request('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async updateUser(id: number, userData: any): Promise<ApiResponse<any>> {
+    return this.request(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async deleteUser(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Méthodes d'authentification
+  async login(credentials: { username: string; password: string }): Promise<ApiResponse<any>> {
+    return this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
-    }),
+    });
+  }
 
-  register: (userData: { username: string; email: string; password: string; fullName: string; acceptTerms: boolean }) =>
-    apiRequest('/api/auth/register', {
+  async register(userData: any): Promise<ApiResponse<any>> {
+    return this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
-    }),
+    });
+  }
 
-  logout: () =>
-    apiRequest('/api/auth/logout', {
+  async logout(): Promise<ApiResponse<any>> {
+    return this.request('/auth/logout', {
       method: 'POST',
-    }),
+    });
+  }
 
-  // Méthodes d'authentification supplémentaires
-  forgotPassword: (data: { email: string }) =>
-    apiRequest('/api/forgot-password', {
+  // Méthodes pour la réinitialisation de mot de passe
+  async requestPasswordReset(email: string): Promise<ApiResponse<any>> {
+    return this.request('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify(data),
-    }),
+      body: JSON.stringify({ email }),
+    });
+  }
 
-  verifyResetCode: (data: { email: string; code: string }) =>
-    apiRequest('/api/verify-reset-code', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  resetPassword: (data: { email: string; code: string; newPassword: string }) =>
-    apiRequest('/api/reset-password', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  verifyEmail: (data: { email: string }) =>
-    apiRequest('/api/auth/verify-email', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  resendVerification: (data: { email: string }) =>
-    apiRequest('/api/auth/resend-verification', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  verifyToken: () =>
-    apiRequest('/api/auth/verify', {
-      method: 'GET',
-    }),
-
-  // Profil utilisateur
-  getProfile: () => apiRequest('/api/users/me'),
-  updateProfile: (profileData: any) =>
-    apiRequest('/api/users/me', {
+  async resetPassword(token: string, newPassword: string): Promise<ApiResponse<any>> {
+    return this.request('/auth/reset-password', {
       method: 'PUT',
-      body: JSON.stringify(profileData),
-    }),
-  deleteAccount: () =>
-    apiRequest('/api/users/me', {
-      method: 'DELETE',
-    }),
+      body: JSON.stringify({ token, newPassword }),
+    });
+  }
 
-  // Couples
-  getCouples: () => apiRequest('/api/couples'),
-  createCouple: (coupleData: any) =>
-    apiRequest('/api/couples', {
+  // Méthodes pour la sauvegarde/restauration (admin seulement)
+  async createBackup(): Promise<ApiResponse<any>> {
+    return this.request('/backup', {
       method: 'POST',
-      body: JSON.stringify(coupleData),
-    }),
-  updateCouple: (id: number, coupleData: any) =>
-    apiRequest(`/api/couples/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(coupleData),
-    }),
-  deleteCouple: (id: number) =>
-    apiRequest(`/api/couples/${id}`, {
-      method: 'DELETE',
-    }),
+    });
+  }
 
-  // Œufs
-  getEggs: () => apiRequest('/api/eggs'),
-  createEgg: (eggData: any) =>
-    apiRequest('/api/eggs', {
-      method: 'POST',
-      body: JSON.stringify(eggData),
-    }),
-  updateEgg: (id: number, eggData: any) =>
-    apiRequest(`/api/eggs/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(eggData),
-    }),
-  deleteEgg: (id: number) =>
-    apiRequest(`/api/eggs/${id}`, {
-      method: 'DELETE',
-    }),
-
-  // Pigeonneaux
-  getPigeonneaux: () => apiRequest('/api/pigeonneaux'),
-  createPigeonneau: (pigeonneauData: any) =>
-    apiRequest('/api/pigeonneaux', {
-      method: 'POST',
-      body: JSON.stringify(pigeonneauData),
-    }),
-  updatePigeonneau: (id: number, pigeonneauData: any) =>
-    apiRequest(`/api/pigeonneaux/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(pigeonneauData),
-    }),
-  deletePigeonneau: (id: number) =>
-    apiRequest(`/api/pigeonneaux/${id}`, {
-      method: 'DELETE',
-    }),
-
-  // Santé - Correction de la route
-  getHealthRecords: () => apiRequest('/api/health-records'),
-  createHealthRecord: (healthData: any) =>
-    apiRequest('/api/health-records', {
-      method: 'POST',
-      body: JSON.stringify(healthData),
-    }),
-  updateHealthRecord: (id: number, healthData: any) =>
-    apiRequest(`/api/health-records/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(healthData),
-    }),
-  deleteHealthRecord: (id: number) =>
-    apiRequest(`/api/health-records/${id}`, {
-      method: 'DELETE',
-    }),
-
-  // Utilisateurs
-  getUsers: () => apiRequest('/api/users'),
-  createUser: (userData: any) =>
-    apiRequest('/api/users', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    }),
-  updateUser: (id: number, userData: any) =>
-    apiRequest(`/api/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(userData),
-    }),
-  deleteUser: (id: number) =>
-    apiRequest(`/api/users/${id}`, {
-      method: 'DELETE',
-    }),
-
-  // Statistiques
-  getStatistics: () => apiRequest('/api/statistics'),
-  getStatisticsByPeriod: (period: string) =>
-    apiRequest(`/api/statistics?period=${period}`),
-
-  // Ventes
-  createSale: (saleData: any) =>
-    apiRequest('/api/sales', {
-      method: 'POST',
-      body: JSON.stringify(saleData),
-    }),
-
-  // Exports
-  exportData: (format: 'pdf' | 'excel' | 'csv', filters?: any) =>
-    apiRequest(`/api/exports/${format}`, {
-      method: 'POST',
-      body: JSON.stringify(filters || {}),
-    }),
-
-  // Backup
-  createBackup: () =>
-    apiRequest('/api/backup', {
-      method: 'POST',
-    }),
-  restoreBackup: (backupData: any) =>
-    apiRequest(`/api/backup/restore`, {
+  async restoreBackup(backupData: any): Promise<ApiResponse<any>> {
+    return this.request('/backup/restore', {
       method: 'POST',
       body: JSON.stringify(backupData),
-    }),
-
-  // Santé du serveur
-  healthCheck: () => apiRequest('/api/health'),
-};
-
-// Fonction pour tester la connectivité
-export const testConnectivity = async () => {
-  try {
-    const response = await api.healthCheck();
-    console.log('✅ Connectivité API OK:', response);
-    return true;
-  } catch (error) {
-    console.error('❌ Problème de connectivité API:', error);
-    return false;
+    });
   }
-};
 
-// Fonction pour initialiser l'API
-export const initializeAPI = async () => {
-  console.log('🌐 Initialisation de l\'API...');
-  console.log('📍 URL de base:', API_BASE_URL);
-  console.log('🔓 Mode: AUTHENTIFICATION DÉSACTIVÉE');
-  
-  const isConnected = await testConnectivity();
-  
-  if (!isConnected) {
-    console.warn('⚠️ Impossible de se connecter à l\'API');
-    console.log('💡 Vérifiez que le serveur backend est démarré');
+  async getBackups(): Promise<ApiResponse<any>> {
+    return this.request('/backup');
   }
-  
-  return isConnected;
+}
+
+// Instance exportée de l'API client
+export const api = new ApiClient(API_BASE_URL);
+
+// Fonctions utilitaires
+export const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'XOF',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 };
 
-export default api;
+export const formatDate = (date: string | Date): string => {
+  return new Intl.DateTimeFormat('fr-FR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(new Date(date));
+};
+
+export const formatDateTime = (date: string | Date): string => {
+  return new Intl.DateTimeFormat('fr-FR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(date));
+};
+
+// Gestion des erreurs
+export const handleApiError = (error: any): string => {
+  if (error?.message) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  return 'Une erreur inattendue s\'est produite';
+};
+
+// Validation des données
+export const validateRequired = (value: any, fieldName: string): string | null => {
+  if (!value || (typeof value === 'string' && value.trim() === '')) {
+    return `${fieldName} est requis`;
+  }
+  return null;
+};
+
+export const validateEmail = (email: string): string | null => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return 'Format d\'email invalide';
+  }
+  return null;
+};
+
+export const validatePhone = (phone: string): string | null => {
+  const phoneRegex = /^(\+33|0)[1-9](\d{8})$/;
+  if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
+    return 'Format de téléphone invalide';
+  }
+  return null;
+};

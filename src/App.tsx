@@ -102,8 +102,6 @@ function App() {
         return <UsersManagement />;
       case 'backup':
         return currentUser?.role === 'admin' ? <BackupRestore /> : null;
-      case 'logs':
-        return null;
       case 'help':
         return <Documentation />;
       default:
