@@ -53,49 +53,86 @@ const EggTracking: React.FC = () => {
     status: 'incubation' as const
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-      if (editingEgg) {
-      // Modification
-      setEggs(eggs.map(e => 
-        e.id === editingEgg.id 
-          ? { 
-              ...formData, 
-              id: e.id,
-              coupleId: parseInt(formData.coupleId),
-              success1: formData.success1,
-              success2: formData.success2
-            }
-          : e
-      ));
-      } else {
-      // Ajout
-      const newEgg: Egg = {
-        ...formData,
-        id: Math.max(...eggs.map(e => e.id)) + 1,
+    try {
+      // Validation côté frontend
+      if (!formData.coupleId || isNaN(parseInt(formData.coupleId))) {
+        alert('Veuillez entrer un ID de couple valide');
+        return;
+      }
+      
+      if (!formData.egg1Date) {
+        alert('Veuillez entrer une date pour le premier œuf');
+        return;
+      }
+
+      // Transformer les données pour le backend
+      const backendData = {
         coupleId: parseInt(formData.coupleId),
+        egg1Date: formData.egg1Date,
+        egg2Date: formData.egg2Date || null,
+        hatchDate1: formData.hatchDate1 || null,
+        hatchDate2: formData.hatchDate2 || null,
         success1: formData.success1,
-        success2: formData.success2
+        success2: formData.success2,
+        observations: formData.observations
       };
-      setEggs([...eggs, newEgg]);
+
+      console.log('🔍 Frontend - Données envoyées:', JSON.stringify(backendData, null, 2));
+
+      if (editingEgg) {
+        // Modification
+        const response = await apiService.updateEgg(editingEgg.id, backendData);
+        if (response.success) {
+          setEggs(eggs.map(e => 
+            e.id === editingEgg.id 
+              ? response.data
+              : e
+          ));
+        }
+      } else {
+        // Ajout
+        const response = await apiService.createEgg(backendData);
+        if (response.success) {
+          setEggs([...eggs, response.data]);
+        }
+      }
+      
+      setShowModal(false);
+      setEditingEgg(null);
+      resetForm();
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      alert('Erreur lors de la sauvegarde de l\'enregistrement d\'œufs');
     }
-    
-    setShowModal(false);
-    setEditingEgg(null);
-    resetForm();
   };
 
   const handleEdit = (egg: Egg) => {
-      setEditingEgg(egg);
-      setFormData({
+    setEditingEgg(egg);
+    
+    // Convertir les dates ISO en format yyyy-MM-dd pour les champs date
+    const formatDateForInput = (dateString: string) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0];
+    };
+    
+    // Vérifier que les données essentielles sont présentes
+    if (!egg.coupleId || !egg.egg1Date) {
+      alert('Données incomplètes pour cet œuf. Veuillez recharger la page.');
+      return;
+    }
+    
+    setFormData({
       coupleId: egg.coupleId.toString(),
-      coupleName: egg.coupleName,
-        egg1Date: egg.egg1Date,
-        egg2Date: egg.egg2Date || '',
-        hatchDate1: egg.hatchDate1 || '',
-        hatchDate2: egg.hatchDate2 || '',
-        success1: egg.success1,
+      coupleName: egg.coupleName || '',
+      egg1Date: formatDateForInput(egg.egg1Date),
+      egg2Date: formatDateForInput(egg.egg2Date || ''),
+      hatchDate1: formatDateForInput(egg.hatchDate1 || ''),
+      hatchDate2: formatDateForInput(egg.hatchDate2 || ''),
+      success1: egg.success1,
       success2: egg.success2 || false,
       observations: egg.observations || '',
       status: egg.status
@@ -103,9 +140,17 @@ const EggTracking: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet enregistrement d\'œufs ?')) {
-      setEggs(eggs.filter(e => e.id !== id));
+      try {
+        const response = await apiService.deleteEgg(id);
+        if (response.success) {
+          setEggs(eggs.filter(e => e.id !== id));
+        }
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression de l\'enregistrement d\'œufs');
+      }
     }
   };
 
@@ -126,7 +171,7 @@ const EggTracking: React.FC = () => {
 
   const filteredEggs = eggs.filter(egg => {
     const matchesSearch = 
-      egg.coupleName.toLowerCase().includes(searchTerm.toLowerCase());
+      (egg.coupleName || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || egg.status === statusFilter;
     
@@ -250,7 +295,7 @@ const EggTracking: React.FC = () => {
                     <tr key={egg.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {egg.coupleName}
+                      {egg.coupleName || 'N/A'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

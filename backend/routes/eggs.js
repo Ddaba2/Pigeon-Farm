@@ -70,14 +70,22 @@ router.post('/', authenticateUser, async (req, res) => {
 // Mettre à jour un enregistrement d'œufs
 router.put('/:id', authenticateUser, async (req, res) => {
   try {
+    console.log('🔍 PUT /eggs/:id - ID:', req.params.id);
+    console.log('🔍 Body reçu:', JSON.stringify(req.body, null, 2));
+    
     const validation = validateEgg(req.body);
+    console.log('🔍 Validation:', validation);
+    
     if (!validation.isValid) {
+      console.log('❌ Validation échouée:', validation.errors);
       return res.status(400).json({ success: false, error: validation.errors.join(', ') });
     }
 
     const updatedEgg = await eggService.updateEgg(req.params.id, req.body);
+    console.log('✅ Mise à jour réussie:', updatedEgg);
     res.json({ success: true, data: updatedEgg });
   } catch (error) {
+    console.log('❌ Erreur dans PUT /eggs/:id:', error.message);
     if (error.message === 'Enregistrement d\'œufs non trouvé') {
       return res.status(404).json({ success: false, error: error.message });
     }

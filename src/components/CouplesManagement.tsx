@@ -91,13 +91,21 @@ const CouplesManagement: React.FC = () => {
 
   const handleEdit = (couple: Couple) => {
     setEditingCouple(couple);
+    
+    // Convertir la date ISO en format yyyy-MM-dd pour le champ date
+    const formatDateForInput = (dateString: string) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0];
+    };
+    
     setFormData({
-      name: couple.name, // nestNumber from backend
-      breed: couple.breed, // race from backend
-      male: couple.male,
-      female: couple.female,
-      formationDate: couple.formationDate,
-      status: couple.status,
+      name: couple.name || '', // nestNumber from backend
+      breed: couple.breed || '', // race from backend
+      male: couple.male || '',
+      female: couple.female || '',
+      formationDate: formatDateForInput(couple.formationDate),
+      status: couple.status || 'active',
       observations: couple.observations || ''
     });
     setShowModal(true);

@@ -78,13 +78,21 @@ class CoupleService {
   // Mettre à jour un couple
   async updateCouple(id, coupleData) {
     try {
-      const { name, breed, maleId, femaleId, formationDate, observations, status } = coupleData;
+      const { 
+        nestNumber, 
+        race, 
+        male, 
+        female, 
+        formationDate, 
+        observations = '', 
+        status = 'active' 
+      } = coupleData;
       
       const result = await executeQuery(`
         UPDATE couples 
         SET nestNumber = ?, race = ?, maleId = ?, femaleId = ?, formationDate = ?, observations = ?, status = ?, updated_at = NOW()
         WHERE id = ?
-      `, [name, breed, maleId, femaleId, formationDate, observations, status, id]);
+      `, [nestNumber, race, male, female, formationDate, observations, status, id]);
       
       if (result.affectedRows === 0) {
         throw new Error('Couple non trouvé');

@@ -156,8 +156,8 @@ const Dashboard: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Activités récentes</h3>
           <div className="space-y-4">
-            {stats.recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-3">
+            {stats.recentActivities.map((activity, index) => (
+              <div key={`${activity.type}-${activity.id}-${index}`} className="flex items-start space-x-3">
                 <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
                   {getIcon(activity.icon)}
                   </div>

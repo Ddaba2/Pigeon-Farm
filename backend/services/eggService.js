@@ -59,7 +59,16 @@ class EggService {
   // Créer un nouvel enregistrement d'œufs
   async createEgg(eggData) {
     try {
-      const { coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations } = eggData;
+      const { 
+        coupleId, 
+        egg1Date, 
+        egg2Date = null, 
+        hatchDate1 = null, 
+        hatchDate2 = null, 
+        success1 = false, 
+        success2 = false, 
+        observations = '' 
+      } = eggData;
       
       const result = await executeQuery(`
         INSERT INTO eggs (coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, createdAt, updated_at)
@@ -75,7 +84,16 @@ class EggService {
   // Mettre à jour un enregistrement d'œufs
   async updateEgg(id, eggData) {
     try {
-      const { coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations } = eggData;
+      const { 
+        coupleId, 
+        egg1Date, 
+        egg2Date = null, 
+        hatchDate1 = null, 
+        hatchDate2 = null, 
+        success1 = false, 
+        success2 = false, 
+        observations = '' 
+      } = eggData;
       
       const result = await executeQuery(`
         UPDATE eggs 
