@@ -47,27 +47,63 @@ const HealthTracking: React.FC = () => {
     observations: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingRecord) {
-      setRecords(records.map(r => 
-        r.id === editingRecord.id 
-          ? { ...formData, id: r.id, targetId: parseInt(formData.targetId) }
-          : r
-      ));
-    } else {
-      const newRecord: HealthRecord = {
-        ...formData,
-        id: Math.max(...records.map(r => r.id)) + 1,
-        targetId: parseInt(formData.targetId)
-      };
-      setRecords([...records, newRecord]);
+    try {
+      // Validation côté frontend
+      if (!formData.targetId || isNaN(parseInt(formData.targetId))) {
+        alert('Veuillez entrer un ID de cible valide');
+        return;
       }
 
+      if (!formData.product) {
+        alert('Veuillez entrer un produit');
+        return;
+      }
+
+      if (!formData.date) {
+        alert('Veuillez entrer une date');
+        return;
+      }
+
+      // Transformer les données pour le backend
+      const backendData = {
+        type: formData.type,
+        targetType: formData.targetType,
+        targetId: parseInt(formData.targetId),
+        product: formData.product,
+        date: formData.date,
+        observations: formData.observations
+      };
+
+      console.log('🔍 Frontend - Données envoyées:', JSON.stringify(backendData, null, 2));
+
+      if (editingRecord) {
+        // Modification
+        const response = await apiService.updateHealthRecord(editingRecord.id, backendData);
+        if (response.success) {
+          setRecords(records.map(r => 
+            r.id === editingRecord.id 
+              ? response.data
+              : r
+          ));
+        }
+      } else {
+        // Ajout
+        const response = await apiService.createHealthRecord(backendData);
+        if (response.success) {
+          setRecords([...records, response.data]);
+        }
+      }
+      
       setShowModal(false);
       setEditingRecord(null);
       resetForm();
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      alert('Erreur lors de la sauvegarde de l\'enregistrement de santé');
+    }
   };
 
   const handleEdit = (record: HealthRecord) => {
@@ -76,18 +112,36 @@ const HealthTracking: React.FC = () => {
       type: record.type,
       targetType: record.targetType,
       targetId: record.targetId.toString(),
-      targetName: record.targetName,
-      product: record.product,
-      date: record.date,
+      targetName: record.targetName || '',
+      product: record.product || '',
+      date: formatDateForInput(record.date),
       observations: record.observations || ''
     });
     setShowModal(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet enregistrement ?')) {
-      setRecords(records.filter(r => r.id !== id));
+      try {
+        const response = await apiService.deleteHealthRecord(id);
+        if (response.success) {
+          setRecords(records.filter(r => r.id !== id));
+        }
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression de l\'enregistrement de santé');
+      }
     }
+  };
+
+  const formatDateForInput = (dateString: string) => {
+    if (!dateString) return new Date().toISOString().split('T')[0];
+    // Si c'est déjà au format yyyy-MM-dd, on le retourne tel quel
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return dateString;
+    }
+    // Sinon on convertit depuis ISO
+    return new Date(dateString).toISOString().split('T')[0];
   };
 
   const resetForm = () => {
@@ -104,8 +158,8 @@ const HealthTracking: React.FC = () => {
 
   const filteredRecords = records.filter(record => {
     const matchesSearch = 
-      record.targetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.product.toLowerCase().includes(searchTerm.toLowerCase());
+      (record.targetName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (record.product || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = typeFilter === 'all' || record.type === typeFilter;
     return matchesSearch && matchesType;
   });
@@ -214,12 +268,12 @@ const HealthTracking: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">
-                      {record.targetName}
+                      {record.targetName || 'N/A'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">
-                      {record.product}
+                      {record.product || 'N/A'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

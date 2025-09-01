@@ -10,7 +10,9 @@ const dbConfig = {
   port: config.database.port,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  // Add connection timeout and retry options
+  connectTimeout: 60000
 };
 
 // Création du pool de connexions

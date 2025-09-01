@@ -5,7 +5,7 @@ import apiService from '../utils/api';
 interface Pigeonneau {
   id: number;
   coupleId: number;
-  coupleName: string;
+  coupleName?: string;
   birthDate: string;
   sex: 'male' | 'female' | 'unknown';
   weight: number;
@@ -117,7 +117,7 @@ const PigeonnalManagement: React.FC = () => {
     setEditingPigeonneau(pigeonneau);
     setFormData({
       coupleId: pigeonneau.coupleId.toString(),
-      coupleName: pigeonneau.coupleName,
+      coupleName: pigeonneau.coupleName || '',
       birthDate: pigeonneau.birthDate,
       sex: pigeonneau.sex,
       weight: pigeonneau.weight.toString(),
@@ -330,7 +330,7 @@ const PigeonnalManagement: React.FC = () => {
                   <input
                     type="text"
                     required
-                    value={formData.coupleName}
+                    value={formData.coupleName || ''}
                     onChange={(e) => setFormData({...formData, coupleName: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
                   />
@@ -394,7 +394,7 @@ const PigeonnalManagement: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prix de vente (FCFA)</label>
                     <input
                       type="number"
-                      value={formData.salePrice}
+                      value={formData.salePrice || ''}
                       onChange={(e) => setFormData({...formData, salePrice: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
                     />
@@ -404,7 +404,7 @@ const PigeonnalManagement: React.FC = () => {
                   <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observations</label>
                 <textarea
-                  value={formData.observations}
+                  value={formData.observations || ''}
                   onChange={(e) => setFormData({...formData, observations: e.target.value})}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"

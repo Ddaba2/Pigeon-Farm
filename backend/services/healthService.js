@@ -67,7 +67,15 @@ class HealthService {
   // Créer un nouvel enregistrement de santé
   async createHealthRecord(healthData) {
     try {
-      const { type, targetType, targetId, product, date, nextDue, observations } = healthData;
+      const { 
+        type, 
+        targetType, 
+        targetId, 
+        product, 
+        date, 
+        nextDue = null, 
+        observations = '' 
+      } = healthData;
       
       const result = await executeQuery(`
         INSERT INTO healthRecords (type, targetType, targetId, product, date, nextDue, observations, created_at, updated_at)
@@ -83,7 +91,15 @@ class HealthService {
   // Mettre à jour un enregistrement de santé
   async updateHealthRecord(id, healthData) {
     try {
-      const { type, targetType, targetId, product, date, nextDue, observations } = healthData;
+      const { 
+        type, 
+        targetType, 
+        targetId, 
+        product, 
+        date, 
+        nextDue = null, 
+        observations = '' 
+      } = healthData;
       
       const result = await executeQuery(`
         UPDATE healthRecords 
@@ -104,7 +120,7 @@ class HealthService {
   // Supprimer un enregistrement de santé
   async deleteHealthRecord(id) {
     try {
-      const [result] = await db.execute('DELETE FROM healthRecords WHERE id = ?', [id]);
+      const result = await executeQuery('DELETE FROM healthRecords WHERE id = ?', [id]);
       
       if (result.affectedRows === 0) {
         throw new Error('Enregistrement de santé non trouvé');
@@ -119,7 +135,7 @@ class HealthService {
   // Récupérer les enregistrements de santé par cible
   async getHealthRecordsByTarget(targetType, targetId) {
     try {
-      const [rows] = await db.execute(`
+      const rows = await executeQuery(`
         SELECT 
           h.id,
           h.type,
@@ -152,7 +168,7 @@ class HealthService {
   // Compter les enregistrements de santé par type
   async getHealthStats() {
     try {
-      const [rows] = await db.execute(`
+      const rows = await executeQuery(`
         SELECT 
           type,
           COUNT(*) as count
@@ -169,7 +185,7 @@ class HealthService {
   // Récupérer les enregistrements de santé par type
   async getHealthRecordsByType(type) {
     try {
-      const [rows] = await db.execute(`
+      const rows = await executeQuery(`
         SELECT 
           h.id,
           h.type,
@@ -202,7 +218,7 @@ class HealthService {
   // Récupérer les enregistrements de santé récents
   async getRecentHealthRecords(limit = 10) {
     try {
-      const [rows] = await db.execute(`
+      const rows = await executeQuery(`
         SELECT 
           h.id,
           h.type,
@@ -235,7 +251,7 @@ class HealthService {
   // Récupérer les enregistrements de santé à venir (nextDue)
   async getUpcomingHealthRecords() {
     try {
-      const [rows] = await db.execute(`
+      const rows = await executeQuery(`
         SELECT 
           h.id,
           h.type,

@@ -7,8 +7,11 @@ const { authenticateUser } = require('../middleware/auth');
 const validateHealthRecord = (data) => {
   const errors = [];
   
-  if (!data.type || !['vaccination', 'treatment', 'exam'].includes(data.type)) {
-    errors.push('Type doit être vaccination, treatment ou exam');
+  console.log('🔍 Validation - Type reçu:', data.type);
+  console.log('🔍 Validation - Types acceptés:', ['vaccination', 'traitement', 'exam', 'examen']);
+  
+  if (!data.type || !['vaccination', 'traitement', 'exam', 'examen'].includes(data.type)) {
+    errors.push('Type doit être vaccination, traitement, exam ou examen');
   }
   
   if (!data.targetType || !['couple', 'pigeonneau'].includes(data.targetType)) {
@@ -26,6 +29,8 @@ const validateHealthRecord = (data) => {
   if (!data.date) {
     errors.push('Date requise');
   }
+  
+  console.log('🔍 Validation - Erreurs:', errors);
   
   return {
     isValid: errors.length === 0,
@@ -59,14 +64,20 @@ router.get('/:id', authenticateUser, async (req, res) => {
 // Créer un nouvel enregistrement de santé
 router.post('/', authenticateUser, async (req, res) => {
   try {
+    console.log('🔍 Backend - Données reçues:', JSON.stringify(req.body, null, 2));
+    
     const validation = validateHealthRecord(req.body);
+    console.log('🔍 Backend - Validation:', validation);
+    
     if (!validation.isValid) {
+      console.log('❌ Backend - Erreurs de validation:', validation.errors);
       return res.status(400).json({ success: false, error: validation.errors.join(', ') });
     }
 
     const newRecord = await healthService.createHealthRecord(req.body);
     res.status(201).json({ success: true, data: newRecord });
   } catch (error) {
+    console.log('❌ Backend - Erreur:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -74,14 +85,22 @@ router.post('/', authenticateUser, async (req, res) => {
 // Mettre à jour un enregistrement de santé
 router.put('/:id', authenticateUser, async (req, res) => {
   try {
+    console.log('🔍 Backend PUT - ID:', req.params.id);
+    console.log('🔍 Backend PUT - Données reçues:', JSON.stringify(req.body, null, 2));
+    
     const validation = validateHealthRecord(req.body);
+    console.log('🔍 Backend PUT - Validation:', validation);
+    
     if (!validation.isValid) {
+      console.log('❌ Backend PUT - Erreurs de validation:', validation.errors);
       return res.status(400).json({ success: false, error: validation.errors.join(', ') });
     }
 
     const updatedRecord = await healthService.updateHealthRecord(req.params.id, req.body);
+    console.log('✅ Backend PUT - Enregistrement mis à jour:', updatedRecord);
     res.json({ success: true, data: updatedRecord });
   } catch (error) {
+    console.log('❌ Backend PUT - Erreur:', error.message);
     if (error.message === 'Enregistrement de santé non trouvé') {
       return res.status(404).json({ success: false, error: error.message });
     }

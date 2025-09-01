@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
     email_verification_token VARCHAR(255) NULL,
     password_reset_token VARCHAR(255) NULL,
     password_reset_expires TIMESTAMP NULL,
+
+    
     INDEX idx_username (username),
     INDEX idx_email (email),
     INDEX idx_role (role)

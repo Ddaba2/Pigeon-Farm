@@ -71,6 +71,8 @@ router.post('/register', asyncHandler(async (req, res) => {
 router.post('/login', asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   
+  console.log('🔐 Login attempt:', { username, password: '***' });
+  
   // Validation des données
   if (!username || !password) {
     return res.status(400).json({
@@ -82,55 +84,69 @@ router.post('/login', asyncHandler(async (req, res) => {
     });
   }
   
-  // Rechercher l'utilisateur dans la base de données
-  const user = await UserService.getUserByUsername(username) || await UserService.getUserByEmail(username);
+  try {
+    // Rechercher l'utilisateur dans la base de données
+    const user = await UserService.getUserByUsername(username) || await UserService.getUserByEmail(username);
+    
+    if (!user) {
+      console.log('❌ User not found:', username);
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: 'Nom d\'utilisateur ou mot de passe incorrect',
+          code: 'INVALID_CREDENTIALS'
+        }
+      });
+    }
+    
+    console.log('✅ User found:', user.username);
+    
+    // Vérifier le mot de passe
+    const isPasswordValid = await comparePassword(password, user.password);
   
-  if (!user) {
-    return res.status(401).json({
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: 'Nom d\'utilisateur ou mot de passe incorrect',
+          code: 'INVALID_CREDENTIALS'
+        }
+      });
+    }
+    
+    // Créer une session
+    const sessionId = createSession(user);
+    
+    // Définir le cookie de session
+    res.cookie('sessionId', sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 heures
+    });
+    
+    res.json({
+      success: true,
+      message: 'Connexion réussie',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role
+      },
+      sessionId
+    });
+  } catch (error) {
+    console.error('❌ Erreur lors de la connexion:', error);
+    res.status(500).json({
       success: false,
       error: {
-        message: 'Nom d\'utilisateur ou mot de passe incorrect',
-        code: 'INVALID_CREDENTIALS'
+        message: 'Erreur interne du serveur',
+        code: 'INTERNAL_ERROR'
       }
     });
   }
-  
-  // Vérifier le mot de passe
-  const isPasswordValid = await comparePassword(password, user.password);
-  
-  if (!isPasswordValid) {
-    return res.status(401).json({
-      success: false,
-      error: {
-        message: 'Nom d\'utilisateur ou mot de passe incorrect',
-        code: 'INVALID_CREDENTIALS'
-      }
-    });
-  }
-  
-  // Créer une session
-  const sessionId = createSession(user);
-  
-  // Définir le cookie de session
-  res.cookie('sessionId', sessionId, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 24 * 60 * 60 * 1000 // 24 heures
-  });
-  
-  res.json({
-    success: true,
-    message: 'Connexion réussie',
-    user: {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      fullName: user.fullName,
-      role: user.role
-    },
-    sessionId
-  });
 }));
 
 // Route de déconnexion
