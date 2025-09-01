@@ -1,340 +1,454 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Users, Calendar, Heart, Activity, Search, Filter, FileText } from 'lucide-react';
+import { Users, Plus, Search, Filter, Edit, Trash2, Eye } from 'lucide-react';
+import apiService from '../utils/api';
 
 interface Couple {
   id: number;
-  maleId: string;
-  femaleId: string;
+  name: string; // nestNumber from backend
+  breed: string; // race from backend
+  male: string;
+  female: string;
   formationDate: string;
-  status: 'active' | 'inactive' | 'breeding';
-  lastBreeding: string;
-  totalEggs: number;
-  totalPigeonneaux: number;
-  notes: string;
+  status: 'active' | 'inactive' | 'reproduction';
+  observations?: string;
 }
 
 const CouplesManagement: React.FC = () => {
   const [couples, setCouples] = useState<Couple[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingCouple, setEditingCouple] = useState<Couple | null>(null);
 
+  // Charger les vraies données depuis l'API
   useEffect(() => {
-    fetchCouples();
+    const loadCouples = async () => {
+      try {
+        const response = await apiService.getCouples();
+        if (response.success && response.data) {
+          setCouples(response.data);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des couples:', error);
+      }
+    };
+
+    loadCouples();
   }, []);
 
-  const fetchCouples = async () => {
+  const [showModal, setShowModal] = useState(false);
+  const [editingCouple, setEditingCouple] = useState<Couple | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const [formData, setFormData] = useState({
+    name: '',
+    breed: '',
+    male: '',
+    female: '',
+    formationDate: new Date().toISOString().split('T')[0],
+    status: 'active' as const,
+    observations: ''
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
-      setIsLoading(true);
-      // Simulation des données - à remplacer par l'appel API réel
-      const mockCouples: Couple[] = [
-        {
-          id: 1,
-          maleId: 'M001',
-          femaleId: 'F001',
-          formationDate: '2024-01-01',
-          status: 'active',
-          lastBreeding: '2024-01-10',
-          totalEggs: 6,
-          totalPigeonneaux: 4,
-          notes: 'Couple très productif'
-        },
-        {
-          id: 2,
-          maleId: 'M002',
-          femaleId: 'F002',
-          formationDate: '2024-01-05',
-          status: 'breeding',
-          lastBreeding: '2024-01-12',
-          totalEggs: 4,
-          totalPigeonneaux: 2,
-          notes: 'En cours de reproduction'
-        },
-        {
-          id: 3,
-          maleId: 'M003',
-          femaleId: 'F003',
-          formationDate: '2023-12-15',
-          status: 'inactive',
-          lastBreeding: '2023-12-20',
-          totalEggs: 8,
-          totalPigeonneaux: 6,
-          notes: 'Couple retiré'
+      // Transformer les données pour le backend
+      const backendData = {
+        nestNumber: formData.name,
+        race: formData.breed,
+        male: formData.male,
+        female: formData.female,
+        formationDate: formData.formationDate,
+        status: formData.status,
+        observations: formData.observations
+      };
+
+      if (editingCouple) {
+        // Modification
+        const response = await apiService.updateCouple(editingCouple.id, backendData);
+        if (response.success) {
+          setCouples(couples.map(c => 
+            c.id === editingCouple.id 
+              ? response.data
+              : c
+          ));
         }
-      ];
+      } else {
+        // Ajout
+        const response = await apiService.createCouple(backendData);
+        if (response.success) {
+          setCouples([...couples, response.data]);
+        }
+      }
       
-      setCouples(mockCouples);
+      setShowModal(false);
+      setEditingCouple(null);
+      resetForm();
     } catch (error) {
-      console.error('Erreur lors du chargement des couples:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Erreur lors de la sauvegarde:', error);
+      alert('Erreur lors de la sauvegarde du couple');
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'text-green-600 bg-green-100 dark:bg-green-900/20';
-      case 'breeding': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20';
-      case 'inactive': return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
-      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
+  const handleEdit = (couple: Couple) => {
+    setEditingCouple(couple);
+    setFormData({
+      name: couple.name, // nestNumber from backend
+      breed: couple.breed, // race from backend
+      male: couple.male,
+      female: couple.female,
+      formationDate: couple.formationDate,
+      status: couple.status,
+      observations: couple.observations || ''
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce couple ?')) {
+    try {
+      const response = await apiService.deleteCouple(id);
+      if (response.success) {
+          setCouples(couples.filter(c => c.id !== id));
+      }
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du couple');
+      }
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active': return 'Actif';
-      case 'breeding': return 'Reproduction';
-      case 'inactive': return 'Inactif';
-      default: return 'Inconnu';
-    }
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      breed: '',
+      male: '',
+      female: '',
+      formationDate: new Date().toISOString().split('T')[0],
+      status: 'active',
+      observations: ''
+    });
   };
 
   const filteredCouples = couples.filter(couple => {
     const matchesSearch = 
-      couple.maleId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      couple.femaleId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      couple.notes.toLowerCase().includes(searchTerm.toLowerCase());
+      (couple.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (couple.breed || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (couple.male || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (couple.female || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || couple.status === statusFilter;
     
     return matchesSearch && matchesStatus;
   });
 
-  const handleAddCouple = () => {
-    setShowAddModal(true);
-    setEditingCouple(null);
-  };
-
-  const handleEditCouple = (couple: Couple) => {
-    setEditingCouple(couple);
-    setShowAddModal(true);
-  };
-
-  const handleDeleteCouple = async (id: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce couple ?')) {
-      try {
-        // Appel API pour supprimer
-        setCouples(couples.filter(c => c.id !== id));
-      } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
-      }
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'reproduction': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'inactive': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      {/* En-tête */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Gestion des Couples
-            </h1>
-            <p className="text-gray-600 dark:text-gray-300 mt-1">
-              Gérez vos couples de pigeons reproducteurs
-            </p>
-          </div>
-          <button
-            onClick={handleAddCouple}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nouveau Couple</span>
-          </button>
+        {/* En-tête */}
+      <div className="flex justify-between items-center">
+            <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Gestion des Couples</h1>
+          <p className="text-gray-600 dark:text-gray-400">Gérez vos couples de pigeons</p>
+            </div>
+            <button
+          onClick={() => {
+            setEditingCouple(null);
+            resetForm();
+            setShowModal(true);
+          }}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+        >
+          <Plus className="h-5 w-5" />
+          Nouveau couple
+            </button>
         </div>
-      </div>
 
-      {/* Filtres et recherche */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      {/* Filtres */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <Search className="h-4 w-4 inline mr-1" />
+              Recherche
+            </label>
               <input
                 type="text"
-                placeholder="Rechercher par ID ou notes..."
+              placeholder="Rechercher un couple..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               />
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-400" />
+            
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <Filter className="h-4 w-4 inline mr-1" />
+              Statut
+            </label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             >
               <option value="all">Tous les statuts</option>
               <option value="active">Actif</option>
-              <option value="breeding">Reproduction</option>
+              <option value="reproduction">En reproduction</option>
               <option value="inactive">Inactif</option>
             </select>
           </div>
+          
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('all');
+              }}
+              className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors"
+            >
+              Réinitialiser
+            </button>
+          </div>
         </div>
-      </div>
+          </div>
 
-      {/* Liste des couples */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+      {/* Tableau */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Couple
-                </th>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Race
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Mâle
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Femelle
+                  </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Date Formation
+                  Date formation
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Dernière Reproduction
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Production
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredCouples.map((couple) => (
-                <tr key={couple.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                          <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {couple.maleId} + {couple.femaleId}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          ID: {couple.id}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {new Date(couple.formationDate).toLocaleDateString('fr-FR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(couple.status)}`}>
-                      {getStatusLabel(couple.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {couple.lastBreeding ? new Date(couple.lastBreeding).toLocaleDateString('fr-FR') : 'Aucune'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      <div className="flex items-center space-x-4">
-                        <span className="flex items-center">
-                          <FileText className="h-4 w-4 mr-1" />
-                          {couple.totalEggs} œufs
-                        </span>
-                        <span className="flex items-center">
-                          <Activity className="h-4 w-4 mr-1" />
-                          {couple.totalPigeonneaux} pigeonneaux
-                        </span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleEditCouple(couple)}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCouple(couple.id)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Statut
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {filteredCouples.map((couple) => (
+                    <tr key={couple.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {couple.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {couple.breed}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {couple.male}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {couple.female}
+                    </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {new Date(couple.formationDate).toLocaleDateString('fr-FR')}
+                    </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(couple.status)}`}>
+                      {couple.status === 'active' ? 'Actif' : 
+                       couple.status === 'reproduction' ? 'Reproduction' : 'Inactif'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                          <button
+                        onClick={() => handleEdit(couple)}
+                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                        title="Modifier"
+                          >
+                        <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(couple.id)}
+                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                        title="Supprimer"
+                          >
+                        <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
               ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
         </div>
-        
+
         {filteredCouples.length === 0 && (
-          <div className="text-center py-12">
-            <Users className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Aucun couple trouvé</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Essayez de modifier vos filtres de recherche.' 
-                : 'Commencez par créer votre premier couple.'}
-            </p>
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            Aucun couple trouvé
           </div>
         )}
       </div>
 
-      {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/20">
-              <Users className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Couples Actifs</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {couples.filter(c => c.status === 'active').length}
-              </p>
-            </div>
+      {/* Modal d'ajout/modification */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+              {editingCouple ? 'Modifier le couple' : 'Nouveau couple'}
+              </h2>
+              
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Nom du couple *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Ex: Couple Alpha"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Race *
+                    </label>
+                  <input
+                    type="text"
+                      required
+                    value={formData.breed}
+                    onChange={(e) => setFormData({...formData, breed: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Ex: Racing Homer"
+                  />
+                </div>
+                  </div>
+                  
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Nom du mâle *
+                    </label>
+                    <input
+                    type="text"
+                    required
+                    value={formData.male}
+                    onChange={(e) => setFormData({...formData, male: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Ex: Romeo"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Nom de la femelle *
+                    </label>
+                    <input
+                      type="text"
+                    required
+                    value={formData.female}
+                    onChange={(e) => setFormData({...formData, female: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Ex: Juliette"
+                  />
+                </div>
+                  </div>
+                  
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Date de formation *
+                    </label>
+                    <input
+                    type="date"
+                    required
+                    value={formData.formationDate}
+                    onChange={(e) => setFormData({...formData, formationDate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Statut *
+                  </label>
+                  <select
+                    required
+                    value={formData.status}
+                    onChange={(e) => setFormData({...formData, status: e.target.value as any})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="active">Actif</option>
+                    <option value="reproduction">En reproduction</option>
+                    <option value="inactive">Inactif</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Observations
+                  </label>
+                  <textarea
+                    value={formData.observations}
+                    onChange={(e) => setFormData({...formData, observations: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Observations sur le couple..."
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingCouple(null);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                  {editingCouple ? 'Modifier' : 'Créer'}
+                  </button>
+                </div>
+              </form>
           </div>
         </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
-              <Heart className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">En Reproduction</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {couples.filter(c => c.status === 'breeding').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/20">
-              <Activity className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Pigeonneaux</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {couples.reduce((sum, c) => sum + c.totalPigeonneaux, 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

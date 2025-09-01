@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+const nodemailer = require('nodemailer');
 
 // Configuration du transporteur email (Gmail pour les tests)
 const transporter = nodemailer.createTransport({
@@ -178,7 +178,7 @@ async function sendPasswordResetConfirmation(to) {
     }
 }
 
-export {
+module.exports = {
     sendPasswordResetEmail,
     sendPasswordResetConfirmation
 }; 

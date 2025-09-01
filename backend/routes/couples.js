@@ -1,238 +1,101 @@
-import express from 'express';
-import { authenticateUser, requireUserOrAdmin } from '../middleware/auth.js';
-import { validateCouple } from '../utils/validation.js';
-import { asyncHandler } from '../utils/errorHandler.js';
-import CoupleService from '../services/coupleService.js';
-
+const express = require('express');
 const router = express.Router();
+const coupleService = require('../services/coupleService');
+const { validateCouple } = require('../utils/validation');
+const { authenticateUser } = require('../middleware/auth');
 
-// GET /api/couples - Récupérer tous les couples
-router.get('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const { status, breed, page = 1, limit = 10 } = req.query;
-  const userId = req.user.id; // Récupérer l'ID de l'utilisateur connecté
-  
+// Récupérer tous les couples
+router.get('/', authenticateUser, async (req, res) => {
   try {
-    const filters = {};
-    if (status) filters.status = status;
-    if (breed) filters.breed = breed;
-    
-    const result = await CoupleService.getCouplesByUserId(userId, parseInt(page), parseInt(limit), filters);
-    
-    res.json({
-      success: true,
-      data: result
-    });
+    const couples = await coupleService.getAllCouples();
+    res.json({ success: true, data: couples });
   } catch (error) {
-    console.error('Erreur lors de la récupération des couples:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération des couples',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// GET /api/couples/:id - Récupérer un couple par ID
-router.get('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const coupleId = parseInt(req.params.id);
-  
+// Récupérer un couple par ID
+router.get('/:id', authenticateUser, async (req, res) => {
   try {
-    const couple = await CoupleService.getCoupleById(coupleId);
-    
+    const couple = await coupleService.getCoupleById(req.params.id);
     if (!couple) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Couple non trouvé',
-          code: 'COUPLE_NOT_FOUND'
-        }
-      });
+      return res.status(404).json({ success: false, error: 'Couple non trouvé' });
     }
-    
-    // Vérifier que l'utilisateur est propriétaire
-    if (couple.user_id !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: {
-          message: 'Accès non autorisé',
-          code: 'UNAUTHORIZED'
-        }
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: couple
-    });
+    res.json({ success: true, data: couple });
   } catch (error) {
-    console.error('Erreur lors de la récupération du couple:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération du couple',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// POST /api/couples - Créer un nouveau couple
-router.post('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const coupleData = req.body;
-  
-  // Validation des données
-  const validation = validateCouple(coupleData);
-  if (!validation.isValid) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        message: 'Données invalides',
-        details: validation.errors
-      }
-    });
-  }
-  
+// Créer un nouveau couple
+router.post('/', authenticateUser, async (req, res) => {
   try {
-    // Ajouter l'ID de l'utilisateur
-    coupleData.userId = req.user.id;
-    
-    // Créer le nouveau couple
-    const newCouple = await CoupleService.createCouple(coupleData);
-    
-    res.status(201).json({
-      success: true,
-      message: 'Couple créé avec succès',
-      data: newCouple
-    });
-  } catch (error) {
-    console.error('Erreur lors de la création du couple:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la création du couple',
-        code: 'INTERNAL_ERROR'
-      }
-    });
-  }
-}));
+    const validation = validateCouple(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, error: validation.errors.join(', ') });
+    }
 
-// PUT /api/couples/:id - Mettre à jour un couple
-router.put('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const coupleId = parseInt(req.params.id);
-  const updateData = req.body;
-  
+    const coupleData = {
+      ...req.body,
+      userId: req.user.id
+    };
+
+    const newCouple = await coupleService.createCouple(coupleData);
+    res.status(201).json({ success: true, data: newCouple });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Mettre à jour un couple
+router.put('/:id', authenticateUser, async (req, res) => {
   try {
-    // Vérifier que le couple existe
-    const couple = await CoupleService.getCoupleById(coupleId);
-    if (!couple) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Couple non trouvé',
-          code: 'COUPLE_NOT_FOUND'
-        }
-      });
+    const validation = validateCouple(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, error: validation.errors.join(', ') });
     }
-    
-    // Vérifier que l'utilisateur est propriétaire
-    if (couple.user_id !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: {
-          message: 'Accès non autorisé',
-          code: 'UNAUTHORIZED'
-        }
-      });
-    }
-    
-    // Mettre à jour le couple
-    const updatedCouple = await CoupleService.updateCouple(coupleId, updateData);
-    
-    res.json({
-      success: true,
-      message: 'Couple mis à jour avec succès',
-      data: updatedCouple
-    });
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour du couple:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la mise à jour du couple',
-        code: 'INTERNAL_ERROR'
-      }
-    });
-  }
-}));
 
-// DELETE /api/couples/:id - Supprimer un couple
-router.delete('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const coupleId = parseInt(req.params.id);
-  
+    const updatedCouple = await coupleService.updateCouple(req.params.id, req.body);
+    res.json({ success: true, data: updatedCouple });
+  } catch (error) {
+    if (error.message === 'Couple non trouvé') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Supprimer un couple
+router.delete('/:id', authenticateUser, async (req, res) => {
   try {
-    // Vérifier que le couple existe
-    const couple = await CoupleService.getCoupleById(coupleId);
-    if (!couple) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Couple non trouvé',
-          code: 'COUPLE_NOT_FOUND'
-        }
-      });
-    }
-    
-    // Vérifier que l'utilisateur est propriétaire
-    if (couple.user_id !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: {
-          message: 'Accès non autorisé',
-          code: 'UNAUTHORIZED'
-        }
-      });
-    }
-    
-    // Supprimer le couple
-    await CoupleService.deleteCouple(coupleId, req.user.id);
-    
-    res.json({
-      success: true,
-      message: 'Couple supprimé avec succès'
-    });
+    const result = await coupleService.deleteCouple(req.params.id);
+    res.json({ success: true, message: result.message });
   } catch (error) {
-    console.error('Erreur lors de la suppression du couple:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la suppression du couple',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    if (error.message === 'Couple non trouvé') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// GET /api/couples/stats/summary - Statistiques des couples
-router.get('/stats/summary', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+// Récupérer les couples par utilisateur
+router.get('/user/:userId', authenticateUser, async (req, res) => {
   try {
-    const stats = await CoupleService.getCoupleStats(req.user.id);
-    
-    res.json({
-      success: true,
-      data: stats
-    });
+    const couples = await coupleService.getCouplesByUser(req.params.userId);
+    res.json({ success: true, data: couples });
   } catch (error) {
-    console.error('Erreur lors de la récupération des statistiques:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération des statistiques',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-export default router; 
+// Récupérer les statistiques des couples
+router.get('/stats/summary', authenticateUser, async (req, res) => {
+  try {
+    const stats = await coupleService.getCoupleStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+module.exports = router; 

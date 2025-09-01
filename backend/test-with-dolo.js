@@ -42,6 +42,22 @@ async function testWithDolo() {
         const errorText = await couplesResponse.text();
         console.log('❌ Erreur couples:', errorText);
       }
+
+      // 3. Test de récupération des statistiques du tableau de bord
+      console.log('\n3️⃣ Test de récupération des statistiques du tableau de bord...');
+      const statsResponse = await fetch(`${BASE_URL}/api/statistics/dashboard`, {
+        headers: { 'Cookie': cookies || '' }
+      });
+
+      console.log('📊 Statut statistiques:', statsResponse.status);
+      
+      if (statsResponse.ok) {
+        const statsResult = await statsResponse.json();
+        console.log('✅ Statistiques récupérées:', JSON.stringify(statsResult, null, 2));
+      } else {
+        const errorText = await statsResponse.text();
+        console.log('❌ Erreur statistiques:', errorText);
+      }
       
     } else {
       const errorText = await response.text();

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '../utils/api';
+import apiService from '../utils/api';
 import { History, Calendar, User, Activity } from 'lucide-react';
 
 // Audit supprimé

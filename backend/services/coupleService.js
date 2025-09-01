@@ -1,201 +1,158 @@
-import { executeQuery, executeTransaction } from '../config/database.js';
+const { executeQuery } = require('../config/database');
 
-export class CoupleService {
-  // Créer un nouveau couple
-  static async createCouple(coupleData) {
-    const { 
-      name, 
-      male, 
-      female, 
-      status = 'actif', 
-      breed, 
-      color, 
-      date_formation, // ✅ Changé de dateFormation à date_formation
-      notes,
-      userId 
-    } = coupleData;
-    
+class CoupleService {
+  // Récupérer tous les couples
+  async getAllCouples() {
     try {
-      const sql = `
-        INSERT INTO couples (name, male, female, status, breed, color, date_formation, notes, user_id, created_at, updated_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `;
-      
-      const result = await executeQuery(sql, [
-        name, male, female, status, breed, color, date_formation, notes, userId
-      ]);
-      
-      // ✅ Retourner directement le résultat de l'insertion
-      return {
-        id: result.insertId,
-        name,
-        male,
-        female,
-        status,
-        breed,
-        color,
-        date_formation,
-        notes,
-        user_id: userId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      const rows = await executeQuery(`
+        SELECT 
+          c.id,
+          c.nestNumber as name,
+          c.race as breed,
+          c.maleId,
+          c.femaleId,
+          c.formationDate,
+          c.observations,
+          c.status,
+          c.created_at,
+          c.updated_at
+        FROM couples c
+        ORDER BY c.created_at DESC
+      `);
+      return rows;
     } catch (error) {
-      console.error('Erreur lors de la création du couple:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération des couples: ${error.message}`);
     }
   }
 
   // Récupérer un couple par ID
-  static async getCoupleById(id) {
+  async getCoupleById(id) {
     try {
-      const sql = `
-        SELECT c.*, u.username as owner_name 
-        FROM couples c 
-        LEFT JOIN users u ON c.user_id = u.id 
+      const rows = await executeQuery(`
+        SELECT 
+          c.id,
+          c.nestNumber as name,
+          c.race as breed,
+          c.maleId,
+          c.femaleId,
+          c.formationDate,
+          c.observations,
+          c.status,
+          c.created_at,
+          c.updated_at
+        FROM couples c
         WHERE c.id = ?
-      `;
-      const couples = await executeQuery(sql, [id]);
-      return couples[0] || null;
+      `, [id]);
+      
+      return rows[0];
     } catch (error) {
-      console.error('Erreur lors de la récupération du couple:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération du couple: ${error.message}`);
     }
   }
 
-  // Récupérer tous les couples d'un utilisateur
-  static async getCouplesByUserId(userId, page = 1, limit = 10, filters = {}) {
+  // Créer un nouveau couple
+  async createCouple(coupleData) {
     try {
-      let sql = `
-        SELECT c.*, u.username as owner_name 
-        FROM couples c 
-        LEFT JOIN users u ON c.user_id = u.id 
-        WHERE c.user_id = ?
-      `;
+      const { 
+        nestNumber, 
+        race, 
+        male, 
+        female, 
+        formationDate, 
+        observations = '', 
+        status = 'active', 
+        userId 
+      } = coupleData;
       
-      const params = [userId];
+      const result = await executeQuery(`
+        INSERT INTO couples (nestNumber, race, maleId, femaleId, formationDate, observations, status, user_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `, [nestNumber, race, male, female, formationDate, observations, status, userId]);
       
-      // Ajouter les filtres
-      if (filters.status) {
-        sql += ' AND c.status = ?';
-        params.push(filters.status);
-      }
-      
-      if (filters.breed) {
-        sql += ' AND c.breed LIKE ?';
-        params.push(`%${filters.breed}%`);
-      }
-      
-      sql += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
-      params.push(limit, (page - 1) * limit);
-      
-      const couples = await executeQuery(sql, params);
-      
-      // Compter le total
-      let countSql = 'SELECT COUNT(*) as total FROM couples WHERE user_id = ?';
-      const countParams = [userId];
-      
-      if (filters.status) {
-        countSql += ' AND status = ?';
-        countParams.push(filters.status);
-      }
-      
-      if (filters.breed) {
-        countSql += ' AND breed LIKE ?';
-        countParams.push(`%${filters.breed}%`);
-      }
-      
-      const [{ total }] = await executeQuery(countSql, countParams);
-      
-      return {
-        couples,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
-          totalCouples: total,
-          hasNextPage: (page - 1) * limit + limit < total,
-          hasPrevPage: page > 1
-        }
-      };
+      return { id: result.insertId, ...coupleData };
     } catch (error) {
-      console.error('Erreur lors de la récupération des couples:', error);
-      throw error;
+      throw new Error(`Erreur lors de la création du couple: ${error.message}`);
     }
   }
 
   // Mettre à jour un couple
-  static async updateCouple(id, updateData) {
+  async updateCouple(id, coupleData) {
     try {
-      const fields = [];
-      const values = [];
+      const { name, breed, maleId, femaleId, formationDate, observations, status } = coupleData;
       
-      // Construire dynamiquement la requête UPDATE
-      Object.keys(updateData).forEach(key => {
-        if (key !== 'id' && key !== 'user_id') {
-          fields.push(`${key} = ?`);
-          values.push(updateData[key]);
-        }
-      });
+      const result = await executeQuery(`
+        UPDATE couples 
+        SET nestNumber = ?, race = ?, maleId = ?, femaleId = ?, formationDate = ?, observations = ?, status = ?, updated_at = NOW()
+        WHERE id = ?
+      `, [name, breed, maleId, femaleId, formationDate, observations, status, id]);
       
-      if (fields.length === 0) {
-        throw new Error('Aucun champ à mettre à jour');
+      if (result.affectedRows === 0) {
+        throw new Error('Couple non trouvé');
       }
       
-      fields.push('updated_at = NOW()');
-      values.push(id);
-      
-      const sql = `UPDATE couples SET ${fields.join(', ')} WHERE id = ?`;
-      await executeQuery(sql, values);
-      
-      // Récupérer le couple mis à jour
-      const updatedCouple = await this.getCoupleById(id);
-      return updatedCouple;
+      return { id, ...coupleData };
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du couple:', error);
-      throw error;
+      throw new Error(`Erreur lors de la mise à jour du couple: ${error.message}`);
     }
   }
 
   // Supprimer un couple
-  static async deleteCouple(id, userId) {
+  async deleteCouple(id) {
     try {
-      // Vérifier que l'utilisateur est propriétaire
-      const couple = await this.getCoupleById(id);
-      if (!couple || couple.user_id !== userId) {
-        throw new Error('Couple non trouvé ou accès non autorisé');
+      const result = await executeQuery('DELETE FROM couples WHERE id = ?', [id]);
+      
+      if (result.affectedRows === 0) {
+        throw new Error('Couple non trouvé');
       }
       
-      const sql = 'DELETE FROM couples WHERE id = ?';
-      await executeQuery(sql, [id]);
-      
-      return true;
+      return { message: 'Couple supprimé avec succès' };
     } catch (error) {
-      console.error('Erreur lors de la suppression du couple:', error);
-      throw error;
+      throw new Error(`Erreur lors de la suppression du couple: ${error.message}`);
     }
   }
 
-  // Récupérer les statistiques des couples
-  static async getCoupleStats(userId) {
+  // Récupérer les couples par utilisateur
+  async getCouplesByUser(userId) {
     try {
-      const sql = `
+      const rows = await executeQuery(`
         SELECT 
-          COUNT(*) as total_couples,
-          COUNT(CASE WHEN status = 'actif' THEN 1 END) as active_couples,
-          COUNT(CASE WHEN status = 'reproduction' THEN 1 END) as breeding_couples,
-          COUNT(CASE WHEN status = 'inactif' THEN 1 END) as inactive_couples,
-          COUNT(DISTINCT breed) as unique_breeds
-        FROM couples 
-        WHERE user_id = ?
-      `;
+          c.id,
+          c.nestNumber as name,
+          c.race as breed,
+          c.maleId,
+          c.femaleId,
+          c.formationDate,
+          c.observations,
+          c.status,
+          c.created_at,
+          c.updated_at
+        FROM couples c
+        WHERE c.user_id = ?
+        ORDER BY c.created_at DESC
+      `, [userId]);
       
-      const [stats] = await executeQuery(sql, [userId]);
-      return stats;
+      return rows;
     } catch (error) {
-      console.error('Erreur lors de la récupération des statistiques:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération des couples: ${error.message}`);
+    }
+  }
+
+  // Compter les couples par statut
+  async getCoupleStats() {
+    try {
+      const rows = await executeQuery(`
+        SELECT 
+          status,
+          COUNT(*) as count
+        FROM couples 
+        GROUP BY status
+      `);
+      
+      return rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des statistiques: ${error.message}`);
     }
   }
 }
 
-export default CoupleService; 
+module.exports = new CoupleService(); 

@@ -1,9 +1,9 @@
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import { config } from '../config/config.js';
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { config } = require('../config/config.js');
 
 // Configuration Helmet pour la sécurité
-export const helmetConfig = helmet({
+const helmetConfig = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -20,7 +20,7 @@ export const helmetConfig = helmet({
 });
 
 // Rate limiting général
-export const rateLimiter = rateLimit({
+const rateLimiter = rateLimit({
   windowMs: config.security.rateLimitWindowMs,
   max: config.security.rateLimitMaxRequests,
   message: {
@@ -32,7 +32,7 @@ export const rateLimiter = rateLimit({
 });
 
 // Rate limiting pour l'authentification
-export const authRateLimiter = rateLimit({
+const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 tentatives max
   message: {
@@ -44,7 +44,7 @@ export const authRateLimiter = rateLimit({
 });
 
 // Logger de sécurité
-export const securityLogger = (req, res, next) => {
+const securityLogger = (req, res, next) => {
   const timestamp = new Date().toISOString();
   const ip = req.ip || req.connection.remoteAddress;
   const method = req.method;
@@ -56,7 +56,7 @@ export const securityLogger = (req, res, next) => {
 };
 
 // Middleware de sécurité de base
-export const basicSecurity = (req, res, next) => {
+const basicSecurity = (req, res, next) => {
   // Headers de sécurité supplémentaires
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -74,7 +74,7 @@ export const basicSecurity = (req, res, next) => {
 };
 
 // Middleware de validation des données
-export const validateData = (schema) => {
+const validateData = (schema) => {
   return (req, res, next) => {
     try {
       if (schema) {
@@ -94,7 +94,7 @@ export const validateData = (schema) => {
   };
 };
 
-export default {
+module.exports = {
   helmetConfig,
   rateLimiter,
   authRateLimiter,

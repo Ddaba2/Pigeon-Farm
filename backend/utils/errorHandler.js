@@ -1,7 +1,7 @@
 // Gestionnaire d'erreurs centralisé pour PigeonFarm
 
 // Classes d'erreurs personnalisées
-export class AppError extends Error {
+class AppError extends Error {
   constructor(message, statusCode, errorCode = null) {
     super(message);
     this.statusCode = statusCode;
@@ -12,39 +12,39 @@ export class AppError extends Error {
   }
 }
 
-export class ValidationError extends AppError {
+class ValidationError extends AppError {
   constructor(message, details = null) {
     super(message, 400, 'VALIDATION_ERROR');
     this.details = details;
   }
 }
 
-export class AuthenticationError extends AppError {
+class AuthenticationError extends AppError {
   constructor(message = 'Authentification requise') {
     super(message, 401, 'AUTHENTICATION_ERROR');
   }
 }
 
-export class AuthorizationError extends AppError {
+class AuthorizationError extends AppError {
   constructor(message = 'Permissions insuffisantes') {
     super(message, 403, 'AUTHORIZATION_ERROR');
   }
 }
 
-export class NotFoundError extends AppError {
+class NotFoundError extends AppError {
   constructor(resource = 'Ressource') {
     super(`${resource} non trouvé(e)`, 404, 'NOT_FOUND');
   }
 }
 
-export class ConflictError extends AppError {
+class ConflictError extends AppError {
   constructor(message = 'Conflit de données') {
     super(message, 409, 'CONFLICT');
   }
 }
 
 // Gestionnaire d'erreurs global
-export const globalErrorHandler = (err, req, res, next) => {
+const globalErrorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
   
@@ -117,20 +117,20 @@ export const globalErrorHandler = (err, req, res, next) => {
 };
 
 // Gestionnaire d'erreurs asynchrones
-export const asyncHandler = (fn) => {
+const asyncHandler = (fn) => {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
 
 // Gestionnaire d'erreurs 404
-export const notFoundHandler = (req, res, next) => {
+const notFoundHandler = (req, res, next) => {
   const error = new NotFoundError(`Route ${req.originalUrl}`);
   next(error);
 };
 
 // Gestionnaire d'erreurs de validation des données
-export const validationErrorHandler = (validationResult) => {
+const validationErrorHandler = (validationResult) => {
   return (req, res, next) => {
     const { isValid, errors } = validationResult(req.body);
     
@@ -144,7 +144,7 @@ export const validationErrorHandler = (validationResult) => {
 };
 
 // Fonction utilitaire pour créer des erreurs avec contexte
-export const createError = (type, context = {}) => {
+const createError = (type, context = {}) => {
   const errorMessages = {
     VALIDATION_ERROR: 'Données invalides',
     AUTHENTICATION_ERROR: 'Authentification requise',
@@ -161,7 +161,7 @@ export const createError = (type, context = {}) => {
 };
 
 // Middleware de gestion des erreurs de parsing JSON
-export const jsonErrorHandler = (err, req, res, next) => {
+const jsonErrorHandler = (err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     const error = new ValidationError('JSON invalide dans le corps de la requête');
     return next(error);
@@ -170,7 +170,7 @@ export const jsonErrorHandler = (err, req, res, next) => {
 };
 
 // Middleware de gestion des erreurs de limite de taille
-export const limitErrorHandler = (err, req, res, next) => {
+const limitErrorHandler = (err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
     const error = new ValidationError('Fichier trop volumineux');
     return next(error);
@@ -183,7 +183,7 @@ export const limitErrorHandler = (err, req, res, next) => {
 };
 
 // Fonction pour formater les erreurs de base de données
-export const formatDatabaseError = (dbError) => {
+const formatDatabaseError = (dbError) => {
   if (dbError.code === 'ER_DUP_ENTRY') {
     return new ConflictError('Cette ressource existe déjà');
   }
@@ -199,7 +199,7 @@ export const formatDatabaseError = (dbError) => {
   return new AppError('Erreur de base de données', 500, 'DATABASE_ERROR');
 };
 
-export default {
+module.exports = {
   AppError,
   ValidationError,
   AuthenticationError,

@@ -1,267 +1,291 @@
-import { executeQuery, executeTransaction } from '../config/database.js';
-import CoupleService from './coupleService.js';
-import EggService from './eggService.js';
-import PigeonneauService from './pigeonneauService.js';
-import HealthService from './healthService.js';
-import SaleService from './saleService.js';
+const { executeQuery } = require('../config/database');
 
-export class StatisticsService {
-  // Récupérer toutes les statistiques d'un utilisateur
-  static async getAllStats(userId) {
+class StatisticsService {
+  // Récupérer les statistiques du tableau de bord
+  async getDashboardStats() {
     try {
-      const [
-        coupleStats,
-        eggStats,
-        pigeonneauStats,
-        healthStats,
-        saleStats
-      ] = await Promise.all([
-        CoupleService.getCoupleStats(userId),
-        EggService.getEggStats(userId),
-        PigeonneauService.getPigeonneauStats(userId),
-        HealthService.getHealthStats(userId),
-        SaleService.getSaleStats(userId)
-      ]);
-
-      return {
-        couples: coupleStats,
-        eggs: eggStats,
-        pigeonneaux: pigeonneauStats,
-        health: healthStats,
-        sales: saleStats,
-        summary: this.calculateSummaryStats(coupleStats, eggStats, pigeonneauStats, healthStats, saleStats)
-      };
-    } catch (error) {
-      console.error('Erreur lors de la récupération des statistiques:', error);
-      throw error;
-    }
-  }
-
-  // Calculer les statistiques de résumé
-  static calculateSummaryStats(coupleStats, eggStats, pigeonneauStats, healthStats, saleStats) {
-    const totalAnimals = (coupleStats?.total_couples || 0) + (pigeonneauStats?.total_pigeonneaux || 0);
-    const totalValue = (saleStats?.total_amount || 0);
-    const successRate = eggStats?.total_eggs > 0 
-      ? ((eggStats.successful_hatches / eggStats.total_eggs) * 100).toFixed(1)
-      : 0;
-
-    return {
-      totalAnimals,
-      totalValue: totalValue.toFixed(2),
-      successRate: `${successRate}%`,
-      activeCouples: coupleStats?.active_couples || 0,
-      breedingCouples: coupleStats?.breeding_couples || 0,
-      alivePigeonneaux: pigeonneauStats?.alive_pigeonneaux || 0,
-      upcomingTreatments: healthStats?.upcoming_treatments || 0
-    };
-  }
-
-  // Récupérer les statistiques de croissance
-  static async getGrowthStats(userId, period = 'year') {
-    try {
-      let dateFilter = '';
-      if (period === 'month') {
-        dateFilter = 'AND created_at >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)';
-      } else if (period === 'year') {
-        dateFilter = 'AND created_at >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)';
-      }
-
-      // Statistiques des couples par mois
-      const couplesByMonth = await executeQuery(`
+      // Compter les couples
+      const couplesCount = await executeQuery('SELECT COUNT(*) as total FROM couples');
+      
+      // Compter les œufs
+      const eggsCount = await executeQuery('SELECT COUNT(*) as total FROM eggs');
+      
+      // Compter les pigeonneaux
+      const pigeonneauxCount = await executeQuery('SELECT COUNT(*) as total FROM pigeonneaux');
+      
+      // Compter les enregistrements de santé
+      const healthCount = await executeQuery('SELECT COUNT(*) as total FROM healthRecords');
+      
+      // Compter les couples par statut
+      const couplesByStatus = await executeQuery(`
         SELECT 
-          MONTH(created_at) as month,
-          COUNT(*) as new_couples
+          status,
+          COUNT(*) as count
         FROM couples 
-        WHERE user_id = ? ${dateFilter}
-        GROUP BY MONTH(created_at)
-        ORDER BY month
-      `, [userId]);
-
-      // Statistiques des pigeonneaux par mois
-      const pigeonneauxByMonth = await executeQuery(`
-        SELECT 
-          MONTH(created_at) as month,
-          COUNT(*) as new_pigeonneaux
-        FROM pigeonneaux 
-        LEFT JOIN couples c ON pigeonneaux.couple_id = c.id
-        WHERE c.user_id = ? ${dateFilter}
-        GROUP BY MONTH(created_at)
-        ORDER BY month
-      `, [userId]);
-
-      // Statistiques des ventes par mois
-      const salesByMonth = await executeQuery(`
-        SELECT 
-          MONTH(date) as month,
-          COUNT(*) as total_sales,
-          SUM(amount) as total_amount
-        FROM sales 
-        WHERE user_id = ? ${dateFilter}
-        GROUP BY MONTH(date)
-        ORDER BY month
-      `, [userId]);
-
-      return {
-        couples: couplesByMonth,
-        pigeonneaux: pigeonneauxByMonth,
-        sales: salesByMonth
-      };
-    } catch (error) {
-      console.error('Erreur lors de la récupération des statistiques de croissance:', error);
-      throw error;
-    }
-  }
-
-  // Récupérer les alertes et notifications
-  static async getAlerts(userId) {
-    try {
-      const alerts = [];
-
-      // Traitements en retard
-      const overdueTreatments = await executeQuery(`
-        SELECT h.*, 
-               CASE 
-                 WHEN h.target_type = 'couple' THEN c.name
-                 WHEN h.target_type = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
-                 ELSE 'N/A'
-               END as target_name
-        FROM health_records h 
-        LEFT JOIN couples c ON h.target_type = 'couple' AND h.target_id = c.id
-        LEFT JOIN pigeonneaux p ON h.target_type = 'pigeonneau' AND h.target_id = p.id
-        WHERE h.user_id = ? AND h.next_due < CURDATE()
-        ORDER BY h.next_due ASC
-      `, [userId]);
-
-      if (overdueTreatments.length > 0) {
-        alerts.push({
-          type: 'warning',
-          title: 'Traitements en retard',
-          message: `${overdueTreatments.length} traitement(s) en retard`,
-          count: overdueTreatments.length,
-          data: overdueTreatments
-        });
-      }
-
-      // Traitements à venir (dans les 7 prochains jours)
-      const upcomingTreatments = await executeQuery(`
-        SELECT h.*, 
-               CASE 
-                 WHEN h.target_type = 'couple' THEN c.name
-                 WHEN h.target_type = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
-                 ELSE 'N/A'
-               END as target_name
-        FROM health_records h 
-        LEFT JOIN couples c ON h.target_type = 'couple' AND h.target_id = c.id
-        LEFT JOIN pigeonneaux p ON h.target_type = 'pigeonneau' AND h.target_id = p.id
-        WHERE h.user_id = ? AND h.next_due BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-        ORDER BY h.next_due ASC
-      `, [userId]);
-
-      if (upcomingTreatments.length > 0) {
-        alerts.push({
-          type: 'info',
-          title: 'Traitements à venir',
-          message: `${upcomingTreatments.length} traitement(s) dans les 7 prochains jours`,
-          count: upcomingTreatments.length,
-          data: upcomingTreatments
-        });
-      }
-
-      // Couples en reproduction depuis longtemps
-      const longBreedingCouples = await executeQuery(`
-        SELECT c.*, DATEDIFF(CURDATE(), c.updated_at) as days_in_reproduction
-        FROM couples c 
-        WHERE c.user_id = ? AND c.status = 'reproduction' 
-        AND DATEDIFF(CURDATE(), c.updated_at) > 30
-        ORDER BY c.updated_at ASC
-      `, [userId]);
-
-      if (longBreedingCouples.length > 0) {
-        alerts.push({
-          type: 'info',
-          title: 'Couples en reproduction prolongée',
-          message: `${longBreedingCouples.length} couple(s) en reproduction depuis plus de 30 jours`,
-          count: longBreedingCouples.length,
-          data: longBreedingCouples
-        });
-      }
-
-      return alerts;
-    } catch (error) {
-      console.error('Erreur lors de la récupération des alertes:', error);
-      throw error;
-    }
-  }
-
-  // Récupérer les performances par race
-  static async getBreedPerformance(userId) {
-    try {
-      const sql = `
-        SELECT 
-          c.breed,
-          COUNT(*) as total_couples,
-          COUNT(CASE WHEN c.status = 'reproduction' THEN 1 END) as breeding_couples,
-          AVG(DATEDIFF(CURDATE(), c.created_at)) as average_age_days
-        FROM couples c 
-        WHERE c.user_id = ? AND c.breed IS NOT NULL
-        GROUP BY c.breed
-        ORDER BY total_couples DESC
-      `;
+        GROUP BY status
+      `);
       
-      const breedStats = await executeQuery(sql, [userId]);
-      return breedStats;
-    } catch (error) {
-      console.error('Erreur lors de la récupération des performances par race:', error);
-      throw error;
-    }
-  }
-
-  // Récupérer les statistiques financières
-  static async getFinancialStats(userId, period = 'all') {
-    try {
-      let dateFilter = '';
-      const params = [userId];
-      
-      if (period === 'month') {
-        dateFilter = 'AND date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)';
-      } else if (period === 'year') {
-        dateFilter = 'AND date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)';
-      }
-      
-      const sql = `
+      // Compter les œufs par succès
+      const eggsBySuccess = await executeQuery(`
         SELECT 
-          SUM(amount) as total_revenue,
-          COUNT(*) as total_transactions,
-          AVG(amount) as average_transaction,
-          MIN(amount) as min_transaction,
-          MAX(amount) as max_transaction,
-          COUNT(DISTINCT client) as unique_clients
-        FROM sales 
-        WHERE user_id = ? ${dateFilter}
-      `;
+          CASE 
+            WHEN success1 = 1 AND success2 = 1 THEN 'success'
+            WHEN success1 = 0 AND success2 = 0 THEN 'failed'
+            ELSE 'partial'
+          END as status,
+          COUNT(*) as count
+        FROM eggs
+        GROUP BY 
+          CASE 
+            WHEN success1 = 1 AND success2 = 1 THEN 'success'
+            WHEN success1 = 0 AND success2 = 0 THEN 'failed'
+            ELSE 'partial'
+          END
+      `);
       
-      const [stats] = await executeQuery(sql, params);
-      
-      // Ajouter les statistiques des pigeonneaux vendus
-      const pigeonneauStats = await executeQuery(`
+      // Compter les pigeonneaux par statut
+      const pigeonneauxByStatus = await executeQuery(`
         SELECT 
-          COUNT(*) as total_sold,
-          SUM(sale_price) as total_pigeonneau_revenue,
-          AVG(sale_price) as average_pigeonneau_price
-        FROM pigeonneaux p 
-        LEFT JOIN couples c ON p.couple_id = c.id
-        WHERE c.user_id = ? AND p.status = 'sold' ${dateFilter.replace('date', 'p.sale_date')}
-      `, params);
+          status,
+          COUNT(*) as count
+        FROM pigeonneaux
+        GROUP BY status
+      `);
+      
+      // Compter les enregistrements de santé par type
+      const healthByType = await executeQuery(`
+        SELECT 
+          type,
+          COUNT(*) as count
+        FROM healthRecords
+        GROUP BY type
+      `);
+      
+      // Activités récentes (derniers enregistrements)
+      const recentActivities = await executeQuery(`
+        (SELECT 'couple' as type, nestNumber as description, created_at as date, id
+         FROM couples
+         ORDER BY created_at DESC
+         LIMIT 2)
+        UNION ALL
+        (SELECT 'egg' as type, CONCAT('Œufs pour couple #', coupleId) as description, createdAt as date, id
+         FROM eggs
+         ORDER BY createdAt DESC
+         LIMIT 2)
+        UNION ALL
+        (SELECT 'pigeonneau' as type, CONCAT('Pigeonneau #', id) as description, created_at as date, id
+         FROM pigeonneaux
+         ORDER BY created_at DESC
+         LIMIT 2)
+        UNION ALL
+        (SELECT 'health' as type, CONCAT(type, ' - ', product) as description, created_at as date, id
+         FROM healthRecords
+         ORDER BY created_at DESC
+         LIMIT 2)
+        ORDER BY date DESC
+        LIMIT 8
+      `);
       
       return {
-        sales: stats,
-        pigeonneaux: pigeonneauStats[0] || {}
+        totalCouples: couplesCount[0].total,
+        totalEggs: eggsCount[0].total,
+        totalPigeonneaux: pigeonneauxCount[0].total,
+        totalHealthRecords: healthCount[0].total,
+        couplesByStatus,
+        eggsBySuccess,
+        pigeonneauxByStatus,
+        healthByType,
+        recentActivities
       };
     } catch (error) {
-      console.error('Erreur lors de la récupération des statistiques financières:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération des statistiques du tableau de bord: ${error.message}`);
+    }
+  }
+
+  // Récupérer les statistiques détaillées
+  async getDetailedStats() {
+    try {
+      // Statistiques des couples
+      const couplesStats = await executeQuery(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+          SUM(CASE WHEN status = 'reproduction' THEN 1 ELSE 0 END) as reproduction,
+          SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive
+        FROM couples
+      `);
+      
+      // Statistiques des œufs
+      const eggsStats = await executeQuery(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN success1 = 1 THEN 1 ELSE 0 END) as success1_count,
+          SUM(CASE WHEN success2 = 1 THEN 1 ELSE 0 END) as success2_count,
+          SUM(CASE WHEN success1 = 0 AND success2 = 0 THEN 1 ELSE 0 END) as failed_count
+        FROM eggs
+      `);
+      
+      // Statistiques des pigeonneaux
+      const pigeonneauxStats = await executeQuery(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+          SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END) as sold,
+          SUM(CASE WHEN status = 'deceased' THEN 1 ELSE 0 END) as deceased,
+          SUM(CASE WHEN sex = 'male' THEN 1 ELSE 0 END) as male,
+          SUM(CASE WHEN sex = 'female' THEN 1 ELSE 0 END) as female,
+          SUM(CASE WHEN sex = 'unknown' THEN 1 ELSE 0 END) as unknown
+        FROM pigeonneaux
+      `);
+      
+      // Statistiques des ventes
+      const salesStats = await executeQuery(`
+        SELECT 
+          COUNT(*) as totalSold,
+          SUM(salePrice) as totalRevenue,
+          AVG(salePrice) as averagePrice,
+          MAX(salePrice) as maxPrice,
+          MIN(salePrice) as minPrice
+        FROM pigeonneaux
+        WHERE status = 'sold' AND salePrice IS NOT NULL
+      `);
+      
+      // Statistiques de santé
+      const healthStats = await executeQuery(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN type = 'vaccination' THEN 1 ELSE 0 END) as vaccinations,
+          SUM(CASE WHEN type = 'treatment' THEN 1 ELSE 0 END) as treatments,
+          SUM(CASE WHEN type = 'exam' THEN 1 ELSE 0 END) as exams
+        FROM healthRecords
+      `);
+      
+      // Évolution mensuelle (6 derniers mois)
+      const monthlyEvolution = await executeQuery(`
+        SELECT 
+          DATE_FORMAT(created_at, '%Y-%m') as month,
+          COUNT(*) as count
+        FROM (
+          SELECT created_at FROM couples
+          UNION ALL
+          SELECT createdAt FROM eggs
+          UNION ALL
+          SELECT created_at FROM pigeonneaux
+          UNION ALL
+          SELECT created_at FROM healthRecords
+        ) as all_records
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+        GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+        ORDER BY month DESC
+      `);
+      
+      return {
+        couples: couplesStats[0],
+        eggs: {
+          ...eggsStats[0],
+          success1Rate: eggsStats[0].total > 0 ? Math.round((eggsStats[0].success1_count / eggsStats[0].total) * 100 * 100) / 100 : 0,
+          success2Rate: eggsStats[0].total > 0 ? Math.round((eggsStats[0].success2_count / eggsStats[0].total) * 100 * 100) / 100 : 0
+        },
+        pigeonneaux: pigeonneauxStats[0],
+        sales: salesStats[0],
+        health: healthStats[0],
+        monthlyEvolution
+      };
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des statistiques détaillées: ${error.message}`);
+    }
+  }
+
+  // Récupérer les statistiques par utilisateur
+  async getStatsByUser(userId) {
+    try {
+      // Couples de l'utilisateur
+      const couplesCount = await executeQuery('SELECT COUNT(*) as total FROM couples WHERE user_id = ?', [userId]);
+      
+      // Œufs des couples de l'utilisateur
+      const eggsCount = await executeQuery(`
+        SELECT COUNT(*) as total 
+        FROM eggs e 
+        JOIN couples c ON e.coupleId = c.id
+        WHERE c.user_id = ?
+      `, [userId]);
+      
+      // Pigeonneaux des couples de l'utilisateur
+      const pigeonneauxCount = await executeQuery(`
+        SELECT COUNT(*) as total 
+        FROM pigeonneaux p
+        JOIN couples c ON p.coupleId = c.id
+        WHERE c.user_id = ? 
+      `, [userId]);
+      
+      // Enregistrements de santé des couples de l'utilisateur
+      const healthCount = await executeQuery(`
+        SELECT COUNT(*) as total 
+        FROM healthRecords h
+        JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
+        WHERE c.user_id = ?
+      `, [userId]);
+      
+      return {
+        totalCouples: couplesCount[0].total,
+        totalEggs: eggsCount[0].total,
+        totalPigeonneaux: pigeonneauxCount[0].total,
+        totalHealthRecords: healthCount[0].total
+      };
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des statistiques utilisateur: ${error.message}`);
+    }
+  }
+
+  // Récupérer les alertes et rappels
+  async getAlerts() {
+    try {
+      // Enregistrements de santé à venir (dans les 7 prochains jours)
+      const upcomingHealth = await executeQuery(`
+        SELECT 
+          h.id,
+          h.type,
+          h.targetType,
+          h.targetId,
+          h.product,
+          h.nextDue,
+          CASE 
+            WHEN h.targetType = 'couple' THEN c.nestNumber
+            WHEN h.targetType = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
+            ELSE 'Inconnu'
+          END as targetName
+        FROM healthRecords h
+        LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
+        LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
+        WHERE h.nextDue IS NOT NULL 
+        AND h.nextDue BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+        ORDER BY h.nextDue ASC
+      `);
+      
+      // Œufs en incubation (plus de 18 jours)
+      const overdueEggs = await executeQuery(`
+        SELECT 
+          e.id,
+          e.coupleId,
+          c.nestNumber as coupleName,
+          e.egg1Date,
+          e.egg2Date,
+          DATEDIFF(CURDATE(), e.egg1Date) as daysSinceEgg1,
+          DATEDIFF(CURDATE(), e.egg2Date) as daysSinceEgg2
+        FROM eggs e
+        LEFT JOIN couples c ON e.coupleId = c.id
+        WHERE (e.hatchDate1 IS NULL AND DATEDIFF(CURDATE(), e.egg1Date) > 18)
+        OR (e.hatchDate2 IS NULL AND e.egg2Date IS NOT NULL AND DATEDIFF(CURDATE(), e.egg2Date) > 18)
+      `);
+      
+      return {
+        upcomingHealth,
+        overdueEggs
+      };
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des alertes: ${error.message}`);
     }
   }
 }
 
-export default StatisticsService; 
+module.exports = new StatisticsService(); 

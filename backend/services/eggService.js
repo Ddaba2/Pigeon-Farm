@@ -1,202 +1,193 @@
-import { executeQuery, executeTransaction } from '../config/database.js';
+const { executeQuery } = require('../config/database');
 
-export class EggService {
-  // Créer un nouvel enregistrement d'œufs
-  static async createEgg(eggData) {
-    const { 
-      coupleId, 
-      egg1Date, 
-      egg2Date, 
-      hatchDate1, 
-      hatchDate2, 
-      success1, 
-      success2, 
-      observations,
-      userId 
-    } = eggData;
-    
+class EggService {
+  // Récupérer tous les œufs
+  async getAllEggs() {
     try {
-      const sql = `
-        INSERT INTO eggs (couple_id, egg1_date, egg2_date, hatch_date1, hatch_date2, success1, success2, observations, created_at, updated_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `;
-      
-      const result = await executeQuery(sql, [
-        coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations
-      ]);
-      
-      // Récupérer l'enregistrement créé
-      const newEgg = await this.getEggById(result.insertId);
-      return newEgg;
+      const rows = await executeQuery(`
+        SELECT 
+          e.id,
+          e.coupleId,
+          c.nestNumber as coupleName,
+          e.egg1Date,
+          e.egg2Date,
+          e.hatchDate1,
+          e.hatchDate2,
+          e.success1,
+          e.success2,
+          e.observations,
+          e.createdAt,
+          e.updated_at
+        FROM eggs e
+        LEFT JOIN couples c ON e.coupleId = c.id
+        ORDER BY e.createdAt DESC
+      `);
+      return rows;
     } catch (error) {
-      console.error('Erreur lors de la création de l\'enregistrement d\'œufs:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération des œufs: ${error.message}`);
     }
   }
 
-  // Récupérer un enregistrement d'œufs par ID
-  static async getEggById(id) {
+  // Récupérer un œuf par ID
+  async getEggById(id) {
     try {
-      const sql = `
-        SELECT e.*, c.name as couple_name, c.male, c.female
+      const rows = await executeQuery(`
+        SELECT 
+          e.id,
+          e.coupleId,
+          c.nestNumber as coupleName,
+          e.egg1Date,
+          e.egg2Date,
+          e.hatchDate1,
+          e.hatchDate2,
+          e.success1,
+          e.success2,
+          e.observations,
+          e.createdAt,
+          e.updated_at
         FROM eggs e 
-        LEFT JOIN couples c ON e.couple_id = c.id 
+        LEFT JOIN couples c ON e.coupleId = c.id
         WHERE e.id = ?
-      `;
-      const eggs = await executeQuery(sql, [id]);
-      return eggs[0] || null;
+      `, [id]);
+      
+      return rows[0];
     } catch (error) {
-      console.error('Erreur lors de la récupération de l\'enregistrement d\'œufs:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération de l'œuf: ${error.message}`);
     }
   }
 
-  // Récupérer tous les enregistrements d'œufs d'un utilisateur
-  static async getEggsByUserId(userId, page = 1, limit = 10, filters = {}) {
+  // Créer un nouvel enregistrement d'œufs
+  async createEgg(eggData) {
     try {
-      let sql = `
-        SELECT e.*, c.name as couple_name, c.male, c.female
-        FROM eggs e 
-        LEFT JOIN couples c ON e.couple_id = c.id 
-        WHERE c.user_id = ?
-      `;
+      const { coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations } = eggData;
       
-      const params = [userId];
+      const result = await executeQuery(`
+        INSERT INTO eggs (coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, createdAt, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `, [coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations]);
       
-      // Ajouter les filtres
-      if (filters.coupleId) {
-        sql += ' AND e.couple_id = ?';
-        params.push(filters.coupleId);
-      }
-      
-      if (filters.success !== undefined) {
-        sql += ' AND (e.success1 = ? OR e.success2 = ?)';
-        params.push(filters.success, filters.success);
-      }
-      
-      sql += ' ORDER BY e.created_at DESC LIMIT ? OFFSET ?';
-      params.push(limit, (page - 1) * limit);
-      
-      const eggs = await executeQuery(sql, params);
-      
-      // Compter le total
-      let countSql = `
-        SELECT COUNT(*) as total 
-        FROM eggs e 
-        LEFT JOIN couples c ON e.couple_id = c.id 
-        WHERE c.user_id = ?
-      `;
-      const countParams = [userId];
-      
-      if (filters.coupleId) {
-        countSql += ' AND e.couple_id = ?';
-        countParams.push(filters.coupleId);
-      }
-      
-      if (filters.success !== undefined) {
-        countSql += ' AND (e.success1 = ? OR e.success2 = ?)';
-        countParams.push(filters.success, filters.success);
-      }
-      
-      const [{ total }] = await executeQuery(countSql, countParams);
-      
-      return {
-        eggs,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
-          totalEggs: total,
-          hasNextPage: (page - 1) * limit + limit < total,
-          hasPrevPage: page > 1
-        }
-      };
+      return { id: result.insertId, ...eggData };
     } catch (error) {
-      console.error('Erreur lors de la récupération des enregistrements d\'œufs:', error);
-      throw error;
+      throw new Error(`Erreur lors de la création de l'enregistrement d'œufs: ${error.message}`);
     }
   }
 
   // Mettre à jour un enregistrement d'œufs
-  static async updateEgg(id, updateData) {
+  async updateEgg(id, eggData) {
     try {
-      const fields = [];
-      const values = [];
+      const { coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations } = eggData;
       
-      // Construire dynamiquement la requête UPDATE
-      Object.keys(updateData).forEach(key => {
-        if (key !== 'id' && key !== 'couple_id') {
-          fields.push(`${key} = ?`);
-          values.push(updateData[key]);
-        }
-      });
+      const result = await executeQuery(`
+        UPDATE eggs 
+        SET coupleId = ?, egg1Date = ?, egg2Date = ?, hatchDate1 = ?, hatchDate2 = ?, success1 = ?, success2 = ?, observations = ?, updated_at = NOW()
+        WHERE id = ?
+      `, [coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, id]);
       
-      if (fields.length === 0) {
-        throw new Error('Aucun champ à mettre à jour');
+      if (result.affectedRows === 0) {
+        throw new Error('Enregistrement d\'œufs non trouvé');
       }
       
-      fields.push('updated_at = NOW()');
-      values.push(id);
-      
-      const sql = `UPDATE eggs SET ${fields.join(', ')} WHERE id = ?`;
-      await executeQuery(sql, values);
-      
-      // Récupérer l'enregistrement mis à jour
-      const updatedEgg = await this.getEggById(id);
-      return updatedEgg;
+      return { id, ...eggData };
     } catch (error) {
-      console.error('Erreur lors de la mise à jour de l\'enregistrement d\'œufs:', error);
-      throw error;
+      throw new Error(`Erreur lors de la mise à jour de l'enregistrement d'œufs: ${error.message}`);
     }
   }
 
   // Supprimer un enregistrement d'œufs
-  static async deleteEgg(id, userId) {
+  async deleteEgg(id) {
     try {
-      // Vérifier que l'utilisateur est propriétaire
-      const egg = await this.getEggById(id);
-      if (!egg) {
+      const result = await executeQuery('DELETE FROM eggs WHERE id = ?', [id]);
+      
+      if (result.affectedRows === 0) {
         throw new Error('Enregistrement d\'œufs non trouvé');
       }
       
-      // Vérifier la propriété via le couple
-      const coupleSql = 'SELECT user_id FROM couples WHERE id = ?';
-      const [{ user_id }] = await executeQuery(coupleSql, [egg.couple_id]);
-      
-      if (user_id !== userId) {
-        throw new Error('Accès non autorisé');
-      }
-      
-      const sql = 'DELETE FROM eggs WHERE id = ?';
-      await executeQuery(sql, [id]);
-      
-      return true;
+      return { message: 'Enregistrement d\'œufs supprimé avec succès' };
     } catch (error) {
-      console.error('Erreur lors de la suppression de l\'enregistrement d\'œufs:', error);
-      throw error;
+      throw new Error(`Erreur lors de la suppression de l'enregistrement d'œufs: ${error.message}`);
     }
   }
 
-  // Récupérer les statistiques des œufs
-  static async getEggStats(userId) {
+  // Récupérer les œufs par couple
+  async getEggsByCouple(coupleId) {
     try {
-      const sql = `
+      const rows = await executeQuery(`
         SELECT 
-          COUNT(*) as total_eggs,
-          COUNT(CASE WHEN success1 = 1 OR success2 = 1 THEN 1 END) as successful_hatches,
-          COUNT(CASE WHEN success1 = 0 OR success2 = 0 THEN 1 END) as failed_hatches,
-          COUNT(CASE WHEN success1 IS NULL AND success2 IS NULL THEN 1 END) as pending_hatches
-        FROM eggs e 
-        LEFT JOIN couples c ON e.couple_id = c.id 
-        WHERE c.user_id = ?
-      `;
+          e.id,
+          e.coupleId,
+          c.nestNumber as coupleName,
+          e.egg1Date,
+          e.egg2Date,
+          e.hatchDate1,
+          e.hatchDate2,
+          e.success1,
+          e.success2,
+          e.observations,
+          e.createdAt,
+          e.updated_at
+        FROM eggs e
+        LEFT JOIN couples c ON e.coupleId = c.id
+        WHERE e.coupleId = ?
+        ORDER BY e.createdAt DESC
+      `, [coupleId]);
       
-      const [stats] = await executeQuery(sql, [userId]);
-      return stats;
+      return rows;
     } catch (error) {
-      console.error('Erreur lors de la récupération des statistiques des œufs:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération des œufs: ${error.message}`);
+    }
+  }
+
+  // Compter les œufs par statut
+  async getEggStats() {
+    try {
+      const rows = await executeQuery(`
+        SELECT 
+          CASE 
+            WHEN success1 = 1 AND success2 = 1 THEN 'success'
+            WHEN success1 = 0 AND success2 = 0 THEN 'failed'
+            ELSE 'partial'
+          END as status,
+          COUNT(*) as count
+        FROM eggs
+        GROUP BY 
+          CASE 
+            WHEN success1 = 1 AND success2 = 1 THEN 'success'
+            WHEN success1 = 0 AND success2 = 0 THEN 'failed'
+            ELSE 'partial'
+          END
+      `);
+      
+      return rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des statistiques: ${error.message}`);
+    }
+  }
+
+  // Calculer le taux de réussite
+  async getSuccessRate() {
+    try {
+      const rows = await executeQuery(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN success1 = 1 THEN 1 ELSE 0 END) as success1_count,
+          SUM(CASE WHEN success2 = 1 THEN 1 ELSE 0 END) as success2_count
+        FROM eggs
+      `);
+      
+      const total = rows[0].total;
+      const success1Rate = total > 0 ? (rows[0].success1_count / total) * 100 : 0;
+      const success2Rate = total > 0 ? (rows[0].success2_count / total) * 100 : 0;
+      
+      return {
+        total,
+        success1Rate: Math.round(success1Rate * 100) / 100,
+        success2Rate: Math.round(success2Rate * 100) / 100,
+        averageRate: Math.round(((success1Rate + success2Rate) / 2) * 100) / 100
+      };
+    } catch (error) {
+      throw new Error(`Erreur lors du calcul du taux de réussite: ${error.message}`);
     }
   }
 }
 
-export default EggService; 
+module.exports = new EggService(); 

@@ -1,7 +1,7 @@
-import express from 'express';
-import bcrypt from 'bcryptjs';
-import { sendPasswordResetEmail, sendPasswordResetConfirmation } from '../services/emailService.js';
-import db from '../config/database.js';
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const { sendPasswordResetEmail, sendPasswordResetConfirmation } = require('../services/emailService.js');
+const { executeQuery } = require('../config/database.js');
 
 const router = express.Router();
 
@@ -25,7 +25,7 @@ router.post('/forgot-password', async (req, res) => {
         console.log('🔍 Vérification de l\'email:', email);
 
         // 1. Vérifier si l'email existe dans la base de données
-        const [users] = await db.execute(
+        const users = await executeQuery(
             'SELECT id, email, username FROM users WHERE email = ?',
             [email]
         );
@@ -42,7 +42,7 @@ router.post('/forgot-password', async (req, res) => {
         console.log('✅ Email trouvé pour l\'utilisateur:', user.username);
 
         // 2. Supprimer les anciens codes de réinitialisation pour cet email
-        await db.execute(
+        await executeQuery(
             'DELETE FROM password_reset_codes WHERE email = ?',
             [email]
         );
@@ -54,7 +54,7 @@ router.post('/forgot-password', async (req, res) => {
         console.log('🔢 Code généré:', code, 'pour l\'email:', email);
 
         // 4. Sauvegarder le code dans la base de données
-        await db.execute(
+        await executeQuery(
             'INSERT INTO password_reset_codes (email, code, expires_at) VALUES (?, ?, ?)',
             [email, code, expiresAt]
         );
@@ -64,7 +64,7 @@ router.post('/forgot-password', async (req, res) => {
 
         if (!emailSent) {
             // Si l'email n'a pas pu être envoyé, supprimer le code
-            await db.execute(
+            await executeQuery(
                 'DELETE FROM password_reset_codes WHERE email = ? AND code = ?',
                 [email, code]
             );
@@ -111,7 +111,7 @@ router.post('/verify-reset-code', async (req, res) => {
         console.log('🔍 Vérification du code:', code, 'pour l\'email:', email);
 
         // Vérifier le code dans la base de données
-        const [codes] = await db.execute(
+        const codes = await executeQuery(
             'SELECT * FROM password_reset_codes WHERE email = ? AND code = ? AND expires_at > NOW() AND used = FALSE',
             [email, code]
         );
@@ -128,7 +128,7 @@ router.post('/verify-reset-code', async (req, res) => {
         console.log('✅ Code vérifié avec succès pour l\'email:', email);
 
         // Marquer le code comme utilisé
-        await db.execute(
+        await executeQuery(
             'UPDATE password_reset_codes SET used = TRUE WHERE id = ?',
             [resetCode.id]
         );
@@ -174,7 +174,7 @@ router.post('/reset-password', async (req, res) => {
         console.log('🔑 Réinitialisation du mot de passe pour l\'email:', email);
 
         // 1. Vérifier que le code est valide et non utilisé
-        const [codes] = await db.execute(
+        const codes = await executeQuery(
             'SELECT * FROM password_reset_codes WHERE email = ? AND code = ? AND expires_at > NOW() AND used = TRUE',
             [email, code]
         );
@@ -191,7 +191,7 @@ router.post('/reset-password', async (req, res) => {
         const hashedPassword = await bcrypt.hash(newPassword, 12);
 
         // 3. Mettre à jour le mot de passe de l'utilisateur
-        const [result] = await db.execute(
+        const result = await executeQuery(
             'UPDATE users SET password = ? WHERE email = ?',
             [hashedPassword, email]
         );
@@ -205,7 +205,7 @@ router.post('/reset-password', async (req, res) => {
         }
 
         // 4. Supprimer tous les codes de réinitialisation pour cet email
-        await db.execute(
+        await executeQuery(
             'DELETE FROM password_reset_codes WHERE email = ?',
             [email]
         );
@@ -238,7 +238,7 @@ router.get('/password-reset-status/:email', async (req, res) => {
         const { email } = req.params;
 
         // Vérifier s'il y a des codes actifs pour cet email
-        const [codes] = await db.execute(
+        const codes = await executeQuery(
             'SELECT * FROM password_reset_codes WHERE email = ? AND expires_at > NOW() AND used = FALSE',
             [email]
         );
@@ -258,4 +258,4 @@ router.get('/password-reset-status/:email', async (req, res) => {
     }
 });
 
-export default router; 
+module.exports = router; 

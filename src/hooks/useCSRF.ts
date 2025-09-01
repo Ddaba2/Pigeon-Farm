@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '../utils/api';
+import apiService from '../utils/api';
 import { safeLocalStorage } from '../utils/edgeCompatibility';
 
 export const useCSRF = () => {
@@ -14,7 +14,7 @@ export const useCSRF = () => {
         setError(null);
         
         // Utiliser la nouvelle API
-        const response = await api.getCSRFToken();
+        const response = await apiService.getCSRFToken();
         
         if (response && response.token) {
           setCsrfToken(response.token);
@@ -46,7 +46,7 @@ export const useCSRF = () => {
       setLoading(true);
       setError(null);
       
-      const response = await api.getCSRFToken();
+      const response = await apiService.getCSRFToken();
       
       if (response && response.token) {
         setCsrfToken(response.token);

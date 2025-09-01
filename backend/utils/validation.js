@@ -40,8 +40,16 @@ export const validateUser = (userData) => {
 export const validateCouple = (coupleData) => {
   const errors = [];
   
-  if (!coupleData.name || coupleData.name.trim().length < 2) {
+  // Accepter nestNumber ou name
+  const name = coupleData.nestNumber || coupleData.name;
+  if (!name || name.trim().length < 2) {
     errors.push('Le nom du couple doit contenir au moins 2 caractères');
+  }
+  
+  // Accepter race ou breed
+  const breed = coupleData.race || coupleData.breed;
+  if (!breed || breed.trim().length < 2) {
+    errors.push('La race doit contenir au moins 2 caractères');
   }
   
   if (!coupleData.male || coupleData.male.trim().length < 2) {
@@ -52,8 +60,8 @@ export const validateCouple = (coupleData) => {
     errors.push('Le nom de la femelle doit contenir au moins 2 caractères');
   }
   
-  if (coupleData.status && !['actif', 'inactif', 'reproduction'].includes(coupleData.status)) {
-    errors.push('Le statut doit être "actif", "inactif" ou "reproduction"');
+  if (coupleData.status && !['active', 'inactive', 'actif', 'inactif', 'reproduction'].includes(coupleData.status)) {
+    errors.push('Le statut doit être "active", "inactive", "actif", "inactif" ou "reproduction"');
   }
   
   return {

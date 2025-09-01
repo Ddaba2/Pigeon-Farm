@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '../utils/api';
+import apiService from '../utils/api';
 import { Plus, Edit, Trash2, Eye, Search, Filter } from 'lucide-react';
 import { User } from '../types/types';
 
@@ -29,7 +29,7 @@ function UsersManagement() {
     setError(null);
     
     try {
-      const response = await api.getUsers();
+      const response = await apiService.getUsers();
       if (response && response.success && response.data) {
         if (Array.isArray(response.data.users)) {
           setUsers(response.data.users);
@@ -62,9 +62,9 @@ function UsersManagement() {
       if (editingId) {
         // Pour la modification, on n'envoie pas le mot de passe
         const { password, ...updateData } = formData;
-        await api.updateUser(editingId, updateData);
+        await apiService.updateUser(editingId, updateData);
       } else {
-        await api.createUser(formData);
+                  await apiService.createUser(formData);
       }
       
       setShowForm(false);
@@ -106,7 +106,7 @@ function UsersManagement() {
     setError(null);
 
     try {
-      await api.deleteUser(id);
+              await apiService.deleteUser(id);
       loadUsers();
     } catch (err: any) {
       console.error('Erreur lors de la suppression:', err);

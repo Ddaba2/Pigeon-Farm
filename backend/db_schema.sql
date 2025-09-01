@@ -9,19 +9,38 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'user'
+    role VARCHAR(50) NOT NULL DEFAULT 'user',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    last_login TIMESTAMP NULL,
+    email_verified BOOLEAN DEFAULT FALSE,
+    email_verification_token VARCHAR(255) NULL,
+    password_reset_token VARCHAR(255) NULL,
+    password_reset_expires TIMESTAMP NULL,
+    INDEX idx_username (username),
+    INDEX idx_email (email),
+    INDEX idx_role (role)
 );
 
 -- Table des couples
 CREATE TABLE IF NOT EXISTS couples (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    nestNumber VARCHAR(50) NOT NULL,
+    user_id INT NOT NULL,
+    nestNumber VARCHAR(50) NOT NULL UNIQUE,
     race VARCHAR(100) NOT NULL,
     formationDate DATE,
     maleId VARCHAR(50),
     femaleId VARCHAR(50),
     observations TEXT,
-    status VARCHAR(50) DEFAULT 'active'
+    status VARCHAR(50) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_nest_number (nestNumber),
+    INDEX idx_race (race),
+    INDEX idx_status (status),
+    INDEX idx_formation_date (formationDate)
 );
 
 -- Table des œufs
@@ -36,7 +55,11 @@ CREATE TABLE IF NOT EXISTS eggs (
     success2 BOOLEAN DEFAULT FALSE,
     observations TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (coupleId) REFERENCES couples(id) ON DELETE CASCADE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (coupleId) REFERENCES couples(id) ON DELETE CASCADE,
+    INDEX idx_couple_id (coupleId),
+    INDEX idx_egg1_date (egg1Date),
+    INDEX idx_hatch_date (hatchDate1)
 );
 
 -- Table des pigeonneaux
@@ -53,8 +76,14 @@ CREATE TABLE IF NOT EXISTS pigeonneaux (
     saleDate DATE,
     buyer VARCHAR(255),
     observations TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (coupleId) REFERENCES couples(id) ON DELETE CASCADE,
-    FOREIGN KEY (eggRecordId) REFERENCES eggs(id) ON DELETE CASCADE
+    FOREIGN KEY (eggRecordId) REFERENCES eggs(id) ON DELETE CASCADE,
+    INDEX idx_couple_id (coupleId),
+    INDEX idx_birth_date (birthDate),
+    INDEX idx_status (status),
+    INDEX idx_sale_date (saleDate)
 );
 
 -- Table des enregistrements de santé
@@ -66,21 +95,30 @@ CREATE TABLE IF NOT EXISTS healthRecords (
     product VARCHAR(100) NOT NULL,
     date DATE NOT NULL,
     nextDue DATE,
-    observations TEXT
+    observations TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_target (targetType, targetId),
+    INDEX idx_type (type),
+    INDEX idx_date (date),
+    INDEX idx_next_due (nextDue)
 );
 
-
-
+-- Table des ventes
 CREATE TABLE IF NOT EXISTS sales (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  date DATE NOT NULL,
-  quantity INT NOT NULL DEFAULT 1,
-  unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
-  amount DECIMAL(10,2) NOT NULL,
-  description VARCHAR(255),
-  client VARCHAR(100),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-); 
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    date DATE NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+    amount DECIMAL(10,2) NOT NULL,
+    description VARCHAR(255),
+    client VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_date (date),
+    INDEX idx_client (client),
+    INDEX idx_amount (amount)
+);
 
 -- Table des codes de réinitialisation de mot de passe
 CREATE TABLE IF NOT EXISTS password_reset_codes (
@@ -91,7 +129,8 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
     used BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_email (email),
-    INDEX idx_expires_at (expires_at)
+    INDEX idx_expires_at (expires_at),
+    INDEX idx_used (used)
 );
 
 -- Table des notifications (pour futures fonctionnalités)
@@ -105,7 +144,8 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_read (user_id, read_status),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_type (type)
 );
 
 -- Table des logs d'audit (pour futures fonctionnalités)
@@ -123,52 +163,30 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_user_action (user_id, action),
     INDEX idx_table_record (table_name, record_id),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_ip_address (ip_address)
 );
-
--- Amélioration de la table users avec timestamps
-ALTER TABLE users 
-ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-ADD COLUMN last_login TIMESTAMP NULL,
-ADD COLUMN email_verified BOOLEAN DEFAULT FALSE,
-ADD COLUMN email_verification_token VARCHAR(255) NULL,
-ADD COLUMN password_reset_token VARCHAR(255) NULL,
-ADD COLUMN password_reset_expires TIMESTAMP NULL;
-
--- Amélioration de la table couples avec timestamps
-ALTER TABLE couples 
-ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
-
--- Amélioration de la table eggs avec timestamps
-ALTER TABLE eggs 
-ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
-
--- Amélioration de la table pigeonneaux avec timestamps
-ALTER TABLE pigeonneaux 
-ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
-
--- Amélioration de la table healthRecords avec timestamps
-ALTER TABLE healthRecords 
-ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
-
--- Amélioration de la table sales avec timestamps
-ALTER TABLE sales 
-ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
-
--- Insertion d'utilisateurs de test
-INSERT INTO users (username, email, password, full_name, role, created_at) 
-VALUES 
-    ('admin', 'admin@pigeonfarm.ml', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Administrateur PigeonFarm', 'admin', NOW()),
-ON DUPLICATE KEY UPDATE id=id;
-
--- Insertion de couples de test
-
-
 -- Vérification de la structure
 SHOW TABLES;
 DESCRIBE users;
-DESCRIBE password_reset_codes; 
+DESCRIBE couples;
+DESCRIBE eggs;
+DESCRIBE pigeonneaux;
+DESCRIBE healthRecords;
+DESCRIBE sales;
+DESCRIBE password_reset_codes;
+DESCRIBE notifications;
+DESCRIBE audit_logs;
+
+-- Affichage des données de test
+SELECT 'Utilisateurs' as table_name, COUNT(*) as count FROM users
+UNION ALL
+SELECT 'Couples', COUNT(*) FROM couples
+UNION ALL
+SELECT 'Œufs', COUNT(*) FROM eggs
+UNION ALL
+SELECT 'Pigeonneaux', COUNT(*) FROM pigeonneaux
+UNION ALL
+SELECT 'Enregistrements de santé', COUNT(*) FROM healthRecords
+UNION ALL
+SELECT 'Ventes', COUNT(*) FROM sales; 

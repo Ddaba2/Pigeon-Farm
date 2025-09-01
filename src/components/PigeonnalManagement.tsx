@@ -1,332 +1,249 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Activity, Calendar, Heart, Search, Filter, Users, Feather } from 'lucide-react';
+import { Activity, Plus, Search, Filter, Edit, Trash2 } from 'lucide-react';
+import apiService from '../utils/api';
 
 interface Pigeonneau {
   id: number;
   coupleId: number;
-  coupleInfo: string;
+  coupleName: string;
   birthDate: string;
-  age: number;
-  status: 'newborn' | 'growing' | 'weaned' | 'ready' | 'sold' | 'deceased';
-  weight: number;
-  color: string;
   sex: 'male' | 'female' | 'unknown';
-  notes: string;
-  location: string;
+  weight: number;
+  status: 'active' | 'sold' | 'deceased';
+  salePrice?: number;
+  observations?: string;
 }
 
 const PigeonnalManagement: React.FC = () => {
   const [pigeonneaux, setPigeonneaux] = useState<Pigeonneau[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingPigeonneau, setEditingPigeonneau] = useState<Pigeonneau | null>(null);
 
+  // Charger les vraies données depuis l'API
   useEffect(() => {
-    fetchPigeonneaux();
+    const loadPigeonneaux = async () => {
+      try {
+        const response = await apiService.getPigeonneaux();
+        if (response.success && response.data) {
+          setPigeonneaux(response.data);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des pigeonneaux:', error);
+      }
+    };
+
+    loadPigeonneaux();
   }, []);
 
-  const fetchPigeonneaux = async () => {
-    try {
-      setIsLoading(true);
-      // Simulation des données - à remplacer par l'appel API réel
-      const mockPigeonneaux: Pigeonneau[] = [
-        {
-          id: 1,
-          coupleId: 1,
-          coupleInfo: 'M001 + F001',
-          birthDate: '2024-01-15',
-          age: 5,
-          status: 'growing',
-          weight: 85,
-          color: 'Gris',
-          sex: 'male',
-          notes: 'Développement normal',
-          location: 'Nid A1'
-        },
-        {
-          id: 2,
-          coupleId: 2,
-          coupleInfo: 'M002 + F002',
-          birthDate: '2024-01-10',
-          age: 10,
-          status: 'weaned',
-          weight: 120,
-          color: 'Blanc',
-          sex: 'female',
-          notes: 'Sevré avec succès',
-          location: 'Volière 1'
-        },
-        {
-          id: 3,
-          coupleId: 3,
-          coupleInfo: 'M003 + F003',
-          birthDate: '2024-01-05',
-          age: 15,
-          status: 'ready',
-          weight: 150,
-          color: 'Brun',
-          sex: 'male',
-          notes: 'Prêt pour la vente',
-          location: 'Volière 2'
-        },
-        {
-          id: 4,
-          coupleId: 1,
-          coupleInfo: 'M001 + F001',
-          birthDate: '2024-01-12',
-          age: 8,
-          status: 'newborn',
-          weight: 45,
-          color: 'Gris',
-          sex: 'unknown',
-          notes: 'Né hier',
-          location: 'Nid A1'
-        }
-      ];
+  const [showModal, setShowModal] = useState(false);
+  const [editingPigeonneau, setEditingPigeonneau] = useState<Pigeonneau | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const [formData, setFormData] = useState({
+    coupleId: '',
+    coupleName: '',
+    birthDate: new Date().toISOString().split('T')[0],
+    sex: 'unknown' as const,
+    weight: '',
+    status: 'active' as const,
+    salePrice: '',
+    observations: ''
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (editingPigeonneau) {
+      setPigeonneaux(pigeonneaux.map(p => 
+        p.id === editingPigeonneau.id 
+          ? { 
+              ...formData, 
+              id: p.id,
+              coupleId: parseInt(formData.coupleId),
+              weight: parseFloat(formData.weight) || 0,
+              salePrice: formData.salePrice ? parseFloat(formData.salePrice) : undefined
+            }
+          : p
+      ));
+      } else {
+        const newPigeonneau: Pigeonneau = {
+          ...formData,
+        id: Math.max(...pigeonneaux.map(p => p.id)) + 1,
+          coupleId: parseInt(formData.coupleId),
+        weight: parseFloat(formData.weight) || 0,
+        salePrice: formData.salePrice ? parseFloat(formData.salePrice) : undefined
+        };
+        setPigeonneaux([...pigeonneaux, newPigeonneau]);
+      }
       
-      setPigeonneaux(mockPigeonneaux);
-    } catch (error) {
-      console.error('Erreur lors du chargement des pigeonneaux:', error);
-    } finally {
-      setIsLoading(false);
+    setShowModal(false);
+    setEditingPigeonneau(null);
+    resetForm();
+  };
+
+  const handleEdit = (pigeonneau: Pigeonneau) => {
+    setEditingPigeonneau(pigeonneau);
+    setFormData({
+      coupleId: pigeonneau.coupleId.toString(),
+      coupleName: pigeonneau.coupleName,
+      birthDate: pigeonneau.birthDate,
+      sex: pigeonneau.sex,
+      weight: pigeonneau.weight.toString(),
+      status: pigeonneau.status,
+      salePrice: pigeonneau.salePrice?.toString() || '',
+      observations: pigeonneau.observations || ''
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce pigeonneau ?')) {
+      setPigeonneaux(pigeonneaux.filter(p => p.id !== id));
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'newborn': return 'text-red-600 bg-red-100 dark:bg-red-900/20';
-      case 'growing': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20';
-      case 'weaned': return 'text-green-600 bg-green-100 dark:bg-green-900/20';
-      case 'ready': return 'text-purple-600 bg-purple-100 dark:bg-purple-900/20';
-      case 'sold': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20';
-      case 'deceased': return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
-      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'newborn': return 'Nouveau-né';
-      case 'growing': return 'En croissance';
-      case 'weaned': return 'Sevré';
-      case 'ready': return 'Prêt';
-      case 'sold': return 'Vendu';
-      case 'deceased': return 'Décédé';
-      default: return 'Inconnu';
-    }
-  };
-
-  const getSexColor = (sex: string) => {
-    switch (sex) {
-      case 'male': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20';
-      case 'female': return 'text-pink-600 bg-pink-100 dark:bg-pink-900/20';
-      case 'unknown': return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
-      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
-    }
-  };
-
-  const getSexLabel = (sex: string) => {
-    switch (sex) {
-      case 'male': return 'Mâle';
-      case 'female': return 'Femelle';
-      case 'unknown': return 'Inconnu';
-      default: return 'Inconnu';
-    }
+  const resetForm = () => {
+    setFormData({
+      coupleId: '',
+      coupleName: '',
+      birthDate: new Date().toISOString().split('T')[0],
+      sex: 'unknown',
+      weight: '',
+      status: 'active',
+      salePrice: '',
+      observations: ''
+    });
   };
 
   const filteredPigeonneaux = pigeonneaux.filter(pigeonneau => {
-    const matchesSearch = 
-      pigeonneau.coupleInfo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pigeonneau.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pigeonneau.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pigeonneau.color.toLowerCase().includes(searchTerm.toLowerCase());
-    
+    const matchesSearch = pigeonneau.coupleName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || pigeonneau.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   });
 
-  const handleAddPigeonneau = () => {
-    setShowAddModal(true);
-    setEditingPigeonneau(null);
-  };
-
-  const handleEditPigeonneau = (pigeonneau: Pigeonneau) => {
-    setEditingPigeonneau(pigeonneau);
-    setShowAddModal(true);
-  };
-
-  const handleDeletePigeonneau = async (id: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce pigeonneau ?')) {
-      try {
-        // Appel API pour supprimer
-        setPigeonneaux(pigeonneaux.filter(p => p.id !== id));
-      } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
-      }
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'sold': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'deceased': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      {/* En-tête */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Gestion des Pigeonneaux
-            </h1>
-            <p className="text-gray-600 dark:text-gray-300 mt-1">
-              Suivez le développement de vos jeunes pigeons
-            </p>
-          </div>
-          <button
-            onClick={handleAddPigeonneau}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nouveau Pigeonneau</span>
-          </button>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Gestion des Pigeonneaux</h1>
+          <p className="text-gray-600 dark:text-gray-400">Gérez vos pigeonneaux et leurs ventes</p>
         </div>
+        <button
+          onClick={() => {
+            setEditingPigeonneau(null);
+            resetForm();
+            setShowModal(true);
+          }}
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+        >
+          <Plus className="h-5 w-5" />
+          Nouveau pigeonneau
+        </button>
       </div>
 
-      {/* Filtres et recherche */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Rechercher par couple, localisation, couleur ou notes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="newborn">Nouveau-né</option>
-              <option value="growing">En croissance</option>
-              <option value="weaned">Sevré</option>
-              <option value="ready">Prêt</option>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <Search className="h-4 w-4 inline mr-1" />
+              Recherche
+            </label>
+          <input
+            type="text"
+              placeholder="Rechercher un couple..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+        
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <Filter className="h-4 w-4 inline mr-1" />
+              Statut
+            </label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="all">Tous les statuts</option>
+              <option value="active">Actif</option>
               <option value="sold">Vendu</option>
               <option value="deceased">Décédé</option>
-            </select>
+          </select>
+        </div>
+        
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('all');
+              }}
+              className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors"
+            >
+              Réinitialiser
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Liste des pigeonneaux */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Pigeonneau
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Couple
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Âge
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Caractéristiques
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Localisation
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Couple</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date naissance</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Sexe</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Poids</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Statut</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {filteredPigeonneaux.map((pigeonneau) => (
                 <tr key={pigeonneau.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
-                          <Activity className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                        </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          ID: {pigeonneau.id}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(pigeonneau.birthDate).toLocaleDateString('fr-FR')}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {pigeonneau.coupleInfo}
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{pigeonneau.coupleName}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>{pigeonneau.age} jours</span>
-                      </div>
+                      {new Date(pigeonneau.birthDate).toLocaleDateString('fr-FR')}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(pigeonneau.status)}`}>
-                      {getStatusLabel(pigeonneau.status)}
+                    <span className="text-sm text-gray-900 dark:text-white">
+                      {pigeonneau.sex === 'male' ? 'Mâle' : pigeonneau.sex === 'female' ? 'Femelle' : 'Inconnu'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSexColor(pigeonneau.sex)}`}>
-                          {getSexLabel(pigeonneau.sex)}
-                        </span>
-                        <span className="text-gray-500 dark:text-gray-400">•</span>
-                        <span>{pigeonneau.color}</span>
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {pigeonneau.weight}g
-                      </div>
-                    </div>
+                    <div className="text-sm text-gray-900 dark:text-white">{pigeonneau.weight}g</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {pigeonneau.location}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(pigeonneau.status)}`}>
+                      {pigeonneau.status === 'active' ? 'Actif' : pigeonneau.status === 'sold' ? 'Vendu' : 'Décédé'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex space-x-2">
                       <button
-                        onClick={() => handleEditPigeonneau(pigeonneau)}
+                        onClick={() => handleEdit(pigeonneau)}
                         className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                         title="Modifier"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDeletePigeonneau(pigeonneau.id)}
+                        onClick={() => handleDelete(pigeonneau.id)}
                         className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                         title="Supprimer"
                       >
@@ -341,95 +258,141 @@ const PigeonnalManagement: React.FC = () => {
         </div>
         
         {filteredPigeonneaux.length === 0 && (
-          <div className="text-center py-12">
-            <Activity className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Aucun pigeonneau trouvé</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Essayez de modifier vos filtres de recherche.' 
-                : 'Commencez par enregistrer votre premier pigeonneau.'}
-            </p>
-          </div>
-        )}
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            Aucun pigeonneau trouvé
+        </div>
+      )}
       </div>
 
-      {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/20">
-              <Heart className="h-6 w-6 text-red-600 dark:text-red-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Nouveau-nés</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {pigeonneaux.filter(p => p.status === 'newborn').length}
-              </p>
-            </div>
-          </div>
-        </div>
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+              {editingPigeonneau ? 'Modifier le pigeonneau' : 'Nouveau pigeonneau'}
+            </h2>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ID du couple *</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.coupleId}
+                    onChange={(e) => setFormData({...formData, coupleId: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nom du couple *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.coupleName}
+                    onChange={(e) => setFormData({...formData, coupleName: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
-              <Activity className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">En Croissance</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {pigeonneaux.filter(p => p.status === 'growing').length}
-              </p>
-            </div>
-          </div>
-        </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date de naissance *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.birthDate}
+                    onChange={(e) => setFormData({...formData, birthDate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sexe *</label>
+                  <select
+                    required
+                    value={formData.sex}
+                    onChange={(e) => setFormData({...formData, sex: e.target.value as any})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="unknown">Inconnu</option>
+                    <option value="male">Mâle</option>
+                    <option value="female">Femelle</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Poids (g) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.weight}
+                    onChange={(e) => setFormData({...formData, weight: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/20">
-              <Feather className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Sevrés</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {pigeonneaux.filter(p => p.status === 'weaned').length}
-              </p>
-            </div>
-          </div>
-        </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Statut *</label>
+                  <select
+                    required
+                    value={formData.status}
+                    onChange={(e) => setFormData({...formData, status: e.target.value as any})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="active">Actif</option>
+                    <option value="sold">Vendu</option>
+                    <option value="deceased">Décédé</option>
+                  </select>
+              </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/20">
-              <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Prêts</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {pigeonneaux.filter(p => p.status === 'ready').length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+                  <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prix de vente (FCFA)</label>
+                    <input
+                      type="number"
+                      value={formData.salePrice}
+                      onChange={(e) => setFormData({...formData, salePrice: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  </div>
+                  
+                  <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observations</label>
+                <textarea
+                  value={formData.observations}
+                  onChange={(e) => setFormData({...formData, observations: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
 
-      {/* Informations sur le développement */}
-      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-green-900 dark:text-green-100 mb-3">
-          🌱 Développement des pigeonneaux
-        </h3>
-        <div className="grid md:grid-cols-2 gap-4 text-sm text-green-800 dark:text-green-200">
-          <div>
-            <p><strong>0-7 jours :</strong> Nourrissage par les parents</p>
-            <p><strong>8-14 jours :</strong> Développement des plumes</p>
-            <p><strong>15-21 jours :</strong> Sevrage progressif</p>
-          </div>
-          <div>
-            <p><strong>22-28 jours :</strong> Premiers vols</p>
-            <p><strong>29-35 jours :</strong> Indépendance complète</p>
-            <p><strong>36+ jours :</strong> Prêt pour la vente</p>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingPigeonneau(null);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                >
+                  {editingPigeonneau ? 'Modifier' : 'Créer'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

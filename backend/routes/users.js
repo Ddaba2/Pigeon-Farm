@@ -1,7 +1,7 @@
-import express from 'express';
-import { authenticateUser, requireAdmin } from '../middleware/auth.js';
-import { asyncHandler } from '../utils/errorHandler.js';
-import UserService from '../services/userService.js';
+const express = require('express');
+const { authenticateUser, requireAdmin } = require('../middleware/auth.js');
+const { asyncHandler } = require('../utils/errorHandler.js');
+const UserService = require('../services/userService.js');
 
 const router = express.Router();
 
@@ -201,4 +201,4 @@ router.put('/profile/me', authenticateUser, asyncHandler(async (req, res) => {
   }
 }));
 
-export default router; 
+module.exports = router; 

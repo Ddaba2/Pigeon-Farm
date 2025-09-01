@@ -1,163 +1,149 @@
-import express from 'express';
-import { authenticateUser, requireUserOrAdmin } from '../middleware/auth.js';
-import { asyncHandler } from '../utils/errorHandler.js';
-import PigeonneauService from '../services/pigeonneauService.js';
-
+const express = require('express');
 const router = express.Router();
+const pigeonneauService = require('../services/pigeonneauService');
+const { authenticateUser } = require('../middleware/auth');
 
-// GET /api/pigeonneaux - Récupérer tous les pigeonneaux
-router.get('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const { coupleId, status, page = 1, limit = 10 } = req.query;
-  const userId = req.user.id;
+// Validation pour les pigeonneaux
+const validatePigeonneau = (data) => {
+  const errors = [];
   
-  try {
-    const filters = {};
-    if (coupleId) filters.coupleId = coupleId;
-    if (status) filters.status = status;
-    
-    const result = await PigeonneauService.getPigeonneauxByUserId(userId, parseInt(page), parseInt(limit), filters);
-    
-    res.json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    console.error('Erreur lors de la récupération des pigeonneaux:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération des pigeonneaux',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+  if (!data.coupleId) {
+    errors.push('ID du couple requis');
   }
-}));
-
-// GET /api/pigeonneaux/:id - Récupérer un pigeonneau par ID
-router.get('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const pigeonneauId = parseInt(req.params.id);
   
+  if (!data.birthDate) {
+    errors.push('Date de naissance requise');
+  }
+  
+  if (!data.sex || !['male', 'female', 'unknown'].includes(data.sex)) {
+    errors.push('Sexe doit être male, female ou unknown');
+  }
+  
+  if (!data.weight || data.weight <= 0) {
+    errors.push('Poids doit être supérieur à 0');
+  }
+  
+  if (!data.status || !['active', 'sold', 'deceased'].includes(data.status)) {
+    errors.push('Statut doit être active, sold ou deceased');
+  }
+  
+  if (data.salePrice !== undefined && data.salePrice < 0) {
+    errors.push('Prix de vente ne peut pas être négatif');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// Récupérer tous les pigeonneaux
+router.get('/', authenticateUser, async (req, res) => {
   try {
-    const pigeonneau = await PigeonneauService.getPigeonneauById(pigeonneauId);
-    
+    const pigeonneaux = await pigeonneauService.getAllPigeonneaux();
+    res.json({ success: true, data: pigeonneaux });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Récupérer un pigeonneau par ID
+router.get('/:id', authenticateUser, async (req, res) => {
+  try {
+    const pigeonneau = await pigeonneauService.getPigeonneauById(req.params.id);
     if (!pigeonneau) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Pigeonneau non trouvé',
-          code: 'PIGEONNEAU_NOT_FOUND'
-        }
-      });
+      return res.status(404).json({ success: false, error: 'Pigeonneau non trouvé' });
     }
-    
-    res.json({
-      success: true,
-      data: pigeonneau
-    });
+    res.json({ success: true, data: pigeonneau });
   } catch (error) {
-    console.error('Erreur lors de la récupération du pigeonneau:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération du pigeonneau',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// POST /api/pigeonneaux - Créer un nouveau pigeonneau
-router.post('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const pigeonneauData = req.body;
-  
+// Créer un nouveau pigeonneau
+router.post('/', authenticateUser, async (req, res) => {
   try {
-    const newPigeonneau = await PigeonneauService.createPigeonneau(pigeonneauData);
-    
-    res.status(201).json({
-      success: true,
-      message: 'Pigeonneau créé avec succès',
-      data: newPigeonneau
-    });
-  } catch (error) {
-    console.error('Erreur lors de la création du pigeonneau:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la création du pigeonneau',
-        code: 'INTERNAL_ERROR'
-      }
-    });
-  }
-}));
+    const validation = validatePigeonneau(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, error: validation.errors.join(', ') });
+    }
 
-// PUT /api/pigeonneaux/:id - Mettre à jour un pigeonneau
-router.put('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const pigeonneauId = parseInt(req.params.id);
-  const updateData = req.body;
-  
+    const newPigeonneau = await pigeonneauService.createPigeonneau(req.body);
+    res.status(201).json({ success: true, data: newPigeonneau });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Mettre à jour un pigeonneau
+router.put('/:id', authenticateUser, async (req, res) => {
   try {
-    const updatedPigeonneau = await PigeonneauService.updatePigeonneau(pigeonneauId, updateData);
-    
-    res.json({
-      success: true,
-      message: 'Pigeonneau mis à jour avec succès',
-      data: updatedPigeonneau
-    });
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour du pigeonneau:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la mise à jour du pigeonneau',
-        code: 'INTERNAL_ERROR'
-      }
-    });
-  }
-}));
+    const validation = validatePigeonneau(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, error: validation.errors.join(', ') });
+    }
 
-// DELETE /api/pigeonneaux/:id - Supprimer un pigeonneau
-router.delete('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const pigeonneauId = parseInt(req.params.id);
-  const userId = req.user.id;
-  
+    const updatedPigeonneau = await pigeonneauService.updatePigeonneau(req.params.id, req.body);
+    res.json({ success: true, data: updatedPigeonneau });
+  } catch (error) {
+    if (error.message === 'Pigeonneau non trouvé') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Supprimer un pigeonneau
+router.delete('/:id', authenticateUser, async (req, res) => {
   try {
-    await PigeonneauService.deletePigeonneau(pigeonneauId, userId);
-    
-    res.json({
-      success: true,
-      message: 'Pigeonneau supprimé avec succès'
-    });
+    const result = await pigeonneauService.deletePigeonneau(req.params.id);
+    res.json({ success: true, message: result.message });
   } catch (error) {
-    console.error('Erreur lors de la suppression du pigeonneau:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la suppression du pigeonneau',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    if (error.message === 'Pigeonneau non trouvé') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// GET /api/pigeonneaux/stats/summary - Statistiques des pigeonneaux
-router.get('/stats/summary', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+// Récupérer les pigeonneaux par couple
+router.get('/couple/:coupleId', authenticateUser, async (req, res) => {
   try {
-    const stats = await PigeonneauService.getPigeonneauStats(req.user.id);
-    
-    res.json({
-      success: true,
-      data: stats
-    });
+    const pigeonneaux = await pigeonneauService.getPigeonneauxByCouple(req.params.coupleId);
+    res.json({ success: true, data: pigeonneaux });
   } catch (error) {
-    console.error('Erreur lors de la récupération des statistiques:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération des statistiques',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-export default router; 
+// Récupérer les statistiques des pigeonneaux
+router.get('/stats/summary', authenticateUser, async (req, res) => {
+  try {
+    const stats = await pigeonneauService.getPigeonneauStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Récupérer les statistiques de vente
+router.get('/stats/sales', authenticateUser, async (req, res) => {
+  try {
+    const salesStats = await pigeonneauService.getSaleStats();
+    res.json({ success: true, data: salesStats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Récupérer les pigeonneaux par sexe
+router.get('/stats/by-sex', authenticateUser, async (req, res) => {
+  try {
+    const sexStats = await pigeonneauService.getPigeonneauxBySex();
+    res.json({ success: true, data: sexStats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+module.exports = router; 

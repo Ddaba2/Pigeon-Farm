@@ -1,8 +1,70 @@
-import { executeQuery, executeTransaction } from '../config/database.js';
+const { executeQuery } = require('../config/database');
 
-export class PigeonneauService {
+class PigeonneauService {
+  // Récupérer tous les pigeonneaux
+  async getAllPigeonneaux() {
+    try {
+      const rows = await executeQuery(`
+        SELECT 
+          p.id,
+          p.coupleId,
+          c.nestNumber as coupleName,
+          p.eggRecordId,
+          p.birthDate,
+          p.sex,
+          p.weight,
+          p.weaningDate,
+          p.status,
+          p.salePrice,
+          p.saleDate,
+          p.buyer,
+          p.observations,
+          p.created_at,
+          p.updated_at
+        FROM pigeonneaux p
+        LEFT JOIN couples c ON p.coupleId = c.id
+        ORDER BY p.created_at DESC
+      `);
+      return rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des pigeonneaux: ${error.message}`);
+    }
+  }
+
+  // Récupérer un pigeonneau par ID
+  async getPigeonneauById(id) {
+    try {
+      const rows = await executeQuery(`
+        SELECT 
+          p.id,
+          p.coupleId,
+          c.nestNumber as coupleName,
+          p.eggRecordId,
+          p.birthDate,
+          p.sex,
+          p.weight,
+          p.weaningDate,
+          p.status,
+          p.salePrice,
+          p.saleDate,
+          p.buyer,
+          p.observations,
+          p.created_at,
+          p.updated_at
+        FROM pigeonneaux p
+        LEFT JOIN couples c ON p.coupleId = c.id
+        WHERE p.id = ?
+      `, [id]);
+      
+      return rows[0];
+  } catch (error) {
+      throw new Error(`Erreur lors de la récupération du pigeonneau: ${error.message}`);
+    }
+  }
+
   // Créer un nouveau pigeonneau
-  static async createPigeonneau(pigeonneauData) {
+  async createPigeonneau(pigeonneauData) {
+    try {
     const { 
       coupleId, 
       eggRecordId, 
@@ -14,208 +76,155 @@ export class PigeonneauService {
       salePrice, 
       saleDate, 
       buyer, 
-      observations,
-      userId 
+        observations 
     } = pigeonneauData;
     
-    try {
-      const sql = `
-        INSERT INTO pigeonneaux (couple_id, egg_record_id, birth_date, sex, weight, weaning_date, status, sale_price, sale_date, buyer, observations, created_at, updated_at) 
+      const result = await executeQuery(`
+        INSERT INTO pigeonneaux (coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `;
+      `, [coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations]);
       
-      const result = await executeQuery(sql, [
-        coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations
-      ]);
-      
-      // Récupérer le pigeonneau créé
-      const newPigeonneau = await this.getPigeonneauById(result.insertId);
-      return newPigeonneau;
+      return { id: result.insertId, ...pigeonneauData };
     } catch (error) {
-      console.error('Erreur lors de la création du pigeonneau:', error);
-      throw error;
-    }
-  }
-
-  // Récupérer un pigeonneau par ID
-  static async getPigeonneauById(id) {
-    try {
-      const sql = `
-        SELECT p.*, c.name as couple_name, c.male, c.female, e.egg1_date, e.egg2_date
-        FROM pigeonneaux p 
-        LEFT JOIN couples c ON p.couple_id = c.id 
-        LEFT JOIN eggs e ON p.egg_record_id = e.id
-        WHERE p.id = ?
-      `;
-      const pigeonneaux = await executeQuery(sql, [id]);
-      return pigeonneaux[0] || null;
-    } catch (error) {
-      console.error('Erreur lors de la récupération du pigeonneau:', error);
-      throw error;
-    }
-  }
-
-  // Récupérer tous les pigeonneaux d'un utilisateur
-  static async getPigeonneauxByUserId(userId, page = 1, limit = 10, filters = {}) {
-    try {
-      let sql = `
-        SELECT p.*, c.name as couple_name, c.male, c.female, e.egg1_date, e.egg2_date
-        FROM pigeonneaux p 
-        LEFT JOIN couples c ON p.couple_id = c.id 
-        LEFT JOIN eggs e ON p.egg_record_id = e.id
-        WHERE c.user_id = ?
-      `;
-      
-      const params = [userId];
-      
-      // Ajouter les filtres
-      if (filters.coupleId) {
-        sql += ' AND p.couple_id = ?';
-        params.push(filters.coupleId);
-      }
-      
-      if (filters.status) {
-        sql += ' AND p.status = ?';
-        params.push(filters.status);
-      }
-      
-      if (filters.sex) {
-        sql += ' AND p.sex = ?';
-        params.push(filters.sex);
-      }
-      
-      sql += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
-      params.push(limit, (page - 1) * limit);
-      
-      const pigeonneaux = await executeQuery(sql, params);
-      
-      // Compter le total
-      let countSql = `
-        SELECT COUNT(*) as total 
-        FROM pigeonneaux p 
-        LEFT JOIN couples c ON p.couple_id = c.id 
-        WHERE c.user_id = ?
-      `;
-      const countParams = [userId];
-      
-      if (filters.coupleId) {
-        countSql += ' AND p.couple_id = ?';
-        countParams.push(filters.coupleId);
-      }
-      
-      if (filters.status) {
-        countSql += ' AND p.status = ?';
-        countParams.push(filters.status);
-      }
-      
-      if (filters.sex) {
-        countSql += ' AND p.sex = ?';
-        countParams.push(filters.sex);
-      }
-      
-      const [{ total }] = await executeQuery(countSql, countParams);
-      
-      return {
-        pigeonneaux,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
-          totalPigeonneaux: total,
-          hasNextPage: (page - 1) * limit + limit < total,
-          hasPrevPage: page > 1
-        }
-      };
-    } catch (error) {
-      console.error('Erreur lors de la récupération des pigeonneaux:', error);
-      throw error;
+      throw new Error(`Erreur lors de la création du pigeonneau: ${error.message}`);
     }
   }
 
   // Mettre à jour un pigeonneau
-  static async updatePigeonneau(id, updateData) {
+  async updatePigeonneau(id, pigeonneauData) {
     try {
-      const fields = [];
-      const values = [];
+      const { 
+        coupleId, 
+        eggRecordId, 
+        birthDate, 
+        sex, 
+        weight, 
+        weaningDate, 
+        status, 
+        salePrice, 
+        saleDate, 
+        buyer, 
+        observations 
+      } = pigeonneauData;
       
-      // Construire dynamiquement la requête UPDATE
-      Object.keys(updateData).forEach(key => {
-        if (key !== 'id' && key !== 'couple_id' && key !== 'egg_record_id') {
-          fields.push(`${key} = ?`);
-          values.push(updateData[key]);
-        }
-      });
+      const result = await executeQuery(`
+        UPDATE pigeonneaux 
+        SET coupleId = ?, eggRecordId = ?, birthDate = ?, sex = ?, weight = ?, weaningDate = ?, status = ?, salePrice = ?, saleDate = ?, buyer = ?, observations = ?, updated_at = NOW()
+        WHERE id = ?
+      `, [coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations, id]);
       
-      if (fields.length === 0) {
-        throw new Error('Aucun champ à mettre à jour');
+      if (result.affectedRows === 0) {
+        throw new Error('Pigeonneau non trouvé');
       }
       
-      fields.push('updated_at = NOW()');
-      values.push(id);
-      
-      const sql = `UPDATE pigeonneaux SET ${fields.join(', ')} WHERE id = ?`;
-      await executeQuery(sql, values);
-      
-      // Récupérer le pigeonneau mis à jour
-      const updatedPigeonneau = await this.getPigeonneauById(id);
-      return updatedPigeonneau;
+      return { id, ...pigeonneauData };
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du pigeonneau:', error);
-      throw error;
+      throw new Error(`Erreur lors de la mise à jour du pigeonneau: ${error.message}`);
     }
   }
 
   // Supprimer un pigeonneau
-  static async deletePigeonneau(id, userId) {
+  async deletePigeonneau(id) {
     try {
-      // Vérifier que l'utilisateur est propriétaire
-      const pigeonneau = await this.getPigeonneauById(id);
-      if (!pigeonneau) {
+      const result = await executeQuery('DELETE FROM pigeonneaux WHERE id = ?', [id]);
+      
+      if (result.affectedRows === 0) {
         throw new Error('Pigeonneau non trouvé');
       }
       
-      // Vérifier la propriété via le couple
-      const coupleSql = 'SELECT user_id FROM couples WHERE id = ?';
-      const [{ user_id }] = await executeQuery(coupleSql, [pigeonneau.couple_id]);
-      
-      if (user_id !== userId) {
-        throw new Error('Accès non autorisé');
-      }
-      
-      const sql = 'DELETE FROM pigeonneaux WHERE id = ?';
-      await executeQuery(sql, [id]);
-      
-      return true;
+      return { message: 'Pigeonneau supprimé avec succès' };
     } catch (error) {
-      console.error('Erreur lors de la suppression du pigeonneau:', error);
-      throw error;
+      throw new Error(`Erreur lors de la suppression du pigeonneau: ${error.message}`);
     }
   }
 
-  // Récupérer les statistiques des pigeonneaux
-  static async getPigeonneauStats(userId) {
+  // Récupérer les pigeonneaux par couple
+  async getPigeonneauxByCouple(coupleId) {
     try {
-      const sql = `
+      const rows = await executeQuery(`
         SELECT 
-          COUNT(*) as total_pigeonneaux,
-          COUNT(CASE WHEN status = 'alive' THEN 1 END) as alive_pigeonneaux,
-          COUNT(CASE WHEN status = 'sold' THEN 1 END) as sold_pigeonneaux,
-          COUNT(CASE WHEN status = 'dead' THEN 1 END) as dead_pigeonneaux,
-          COUNT(CASE WHEN sex = 'male' THEN 1 END) as male_pigeonneaux,
-          COUNT(CASE WHEN sex = 'female' THEN 1 END) as female_pigeonneaux,
-          COUNT(CASE WHEN sex = 'unknown' THEN 1 END) as unknown_sex_pigeonneaux,
-          AVG(weight) as average_weight
-        FROM pigeonneaux p 
-        LEFT JOIN couples c ON p.couple_id = c.id 
-        WHERE c.user_id = ?
-      `;
+          p.id,
+          p.coupleId,
+          c.nestNumber as coupleName,
+          p.eggRecordId,
+          p.birthDate,
+          p.sex,
+          p.weight,
+          p.weaningDate,
+          p.status,
+          p.salePrice,
+          p.saleDate,
+          p.buyer,
+          p.observations,
+          p.created_at,
+          p.updated_at
+        FROM pigeonneaux p
+        LEFT JOIN couples c ON p.coupleId = c.id
+        WHERE p.coupleId = ?
+        ORDER BY p.created_at DESC
+      `, [coupleId]);
       
-      const [stats] = await executeQuery(sql, [userId]);
-      return stats;
+      return rows;
     } catch (error) {
-      console.error('Erreur lors de la récupération des statistiques des pigeonneaux:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération des pigeonneaux: ${error.message}`);
+    }
+  }
+
+  // Compter les pigeonneaux par statut
+  async getPigeonneauStats() {
+    try {
+      const rows = await executeQuery(`
+        SELECT 
+          status,
+          COUNT(*) as count
+        FROM pigeonneaux
+        GROUP BY status
+      `);
+      
+      return rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des statistiques: ${error.message}`);
+    }
+  }
+
+  // Calculer les statistiques de vente
+  async getSaleStats() {
+    try {
+      const rows = await executeQuery(`
+        SELECT 
+          COUNT(*) as totalSold,
+          SUM(salePrice) as totalRevenue,
+          AVG(salePrice) as averagePrice
+        FROM pigeonneaux
+        WHERE status = 'sold' AND salePrice IS NOT NULL
+      `);
+      
+      return {
+        totalSold: rows[0].totalSold || 0,
+        totalRevenue: rows[0].totalRevenue || 0,
+        averagePrice: Math.round((rows[0].averagePrice || 0) * 100) / 100
+      };
+    } catch (error) {
+      throw new Error(`Erreur lors du calcul des statistiques de vente: ${error.message}`);
+    }
+  }
+
+  // Récupérer les pigeonneaux par sexe
+  async getPigeonneauxBySex() {
+    try {
+      const rows = await executeQuery(`
+        SELECT 
+          sex,
+          COUNT(*) as count
+        FROM pigeonneaux
+        GROUP BY sex
+      `);
+      
+      return rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des statistiques par sexe: ${error.message}`);
     }
   }
 }
 
-export default PigeonneauService; 
+module.exports = new PigeonneauService(); 

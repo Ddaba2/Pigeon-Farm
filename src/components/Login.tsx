@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '../utils/api';
+import apiService from '../utils/api';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { safeLocalStorage } from '../utils/edgeCompatibility';
@@ -90,7 +90,7 @@ function Login({ onAuthSuccess }: LoginProps) {
     setError(null);
 
     try {
-      await api.forgotPassword({ email: resetEmail });
+      await apiService.forgotPassword({ email: resetEmail });
       setSuccess('Code à 4 chiffres envoyé à votre email');
       goToForgotPasswordStep('code');
     } catch (err: any) {
@@ -110,7 +110,7 @@ function Login({ onAuthSuccess }: LoginProps) {
     setError(null);
 
     try {
-      await api.verifyResetCode({ email: resetEmail, code: resetCode });
+      await apiService.verifyResetCode({ email: resetEmail, code: resetCode });
       setSuccess('Code vérifié avec succès ! Créez votre nouveau mot de passe');
       goToForgotPasswordStep('new-password');
     } catch (err: any) {
@@ -140,7 +140,7 @@ function Login({ onAuthSuccess }: LoginProps) {
     setError(null);
 
     try {
-      await api.resetPassword({ 
+      await apiService.resetPassword({ 
         email: resetEmail, 
         code: resetCode, 
         newPassword 
@@ -177,7 +177,7 @@ function Login({ onAuthSuccess }: LoginProps) {
     try {
       if (isLogin) {
         // Connexion simplifiée sans JWT
-        const res = await api.login({
+        const res = await apiService.login({
           username: formData.username,
           password: formData.password
         });
@@ -191,7 +191,7 @@ function Login({ onAuthSuccess }: LoginProps) {
         }
       } else {
         // Inscription
-        await api.register({
+        await apiService.register({
           username: formData.username,
           email: formData.email,
           password: formData.password,
@@ -231,7 +231,7 @@ function Login({ onAuthSuccess }: LoginProps) {
     setError(null);
 
     try {
-      await api.verifyEmail({ email: formData.email });
+              await apiService.verifyEmail({ email: resetEmail });
       setSuccess('Email de vérification envoyé');
     } catch (err: any) {
       setError(err.message || 'Erreur lors de l\'envoi de l\'email');
@@ -250,7 +250,7 @@ function Login({ onAuthSuccess }: LoginProps) {
     setError(null);
 
     try {
-      await api.resendVerification({ email: formData.email });
+              await apiService.resendVerification({ email: formData.email });
       setSuccess('Email de vérification renvoyé');
     } catch (err: any) {
       setError(err.message || 'Erreur lors de l\'envoi de l\'email');
@@ -264,7 +264,7 @@ function Login({ onAuthSuccess }: LoginProps) {
     const token = safeLocalStorage.getItem('token');
     if (token) {
       // Vérifier la validité du token
-      api.verifyToken().then((user: any) => {
+              apiService.verifyToken().then((user: any) => {
         onAuthSuccess(user, 'Session restaurée');
       }).catch(() => {
         safeLocalStorage.removeItem('token');

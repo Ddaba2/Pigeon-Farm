@@ -1,252 +1,283 @@
-// Configuration de l'API pour PigeonFarm
-const API_BASE_URL = 'http://localhost:3002/api';
-
-// Types pour les réponses API
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  error?: string;
-}
-
-// Classe principale pour les appels API
-class ApiClient {
+// Service API centralisé pour l'authentification par session
+class ApiService {
   private baseURL: string;
 
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
+  constructor() {
+    this.baseURL = 'http://localhost:3002/api';
   }
 
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    try {
-      const url = `${this.baseURL}${endpoint}`;
-      const token = localStorage.getItem('token');
-      
-      const config: RequestInit = {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-          ...options.headers,
-        },
-        ...options,
+  ): Promise<T> {
+    const url = `${this.baseURL}${endpoint}`;
+    
+    // Récupérer le sessionId du localStorage
+    const sessionId = localStorage.getItem('sessionId');
+    
+    // Configuration par défaut pour l'authentification par session
+    const defaultOptions: RequestInit = {
+      credentials: 'include', // Inclure les cookies de session
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    };
+
+    // Ajouter le sessionId dans l'en-tête si disponible
+    if (sessionId) {
+      defaultOptions.headers = {
+        ...defaultOptions.headers,
+        'x-session-id': sessionId,
       };
+    }
 
-      const response = await fetch(url, config);
-      const data = await response.json();
-
+    try {
+      const response = await fetch(url, defaultOptions);
+      
       if (!response.ok) {
-        throw new Error(data.message || `Erreur HTTP: ${response.status}`);
+        if (response.status === 401) {
+          throw new Error('Authentification requise');
+        }
+        throw new Error(`Erreur de requête: ${response.status}`);
       }
 
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('Erreur API:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Erreur inconnue',
-      };
+      console.error(`Erreur API ${endpoint}:`, error);
+      throw error;
     }
   }
 
-  // Méthodes pour les couples
-  async getCouples(): Promise<ApiResponse<any>> {
-    return this.request('/couples');
-  }
-
-  async createCouple(coupleData: any): Promise<ApiResponse<any>> {
-    return this.request('/couples', {
+  // Authentification
+  async register(userData: { username: string; email: string; password: string; fullName?: string; acceptTerms: boolean }) {
+    const response = await fetch(`${this.baseURL}/auth/register`, {
       method: 'POST',
-      body: JSON.stringify(coupleData),
-    });
-  }
-
-  async updateCouple(id: number, coupleData: any): Promise<ApiResponse<any>> {
-    return this.request(`/couples/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(coupleData),
-    });
-  }
-
-  async deleteCouple(id: number): Promise<ApiResponse<any>> {
-    return this.request(`/couples/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Méthodes pour les œufs
-  async getEggs(): Promise<ApiResponse<any>> {
-    return this.request('/eggs');
-  }
-
-  async createEgg(eggData: any): Promise<ApiResponse<any>> {
-    return this.request('/eggs', {
-      method: 'POST',
-      body: JSON.stringify(eggData),
-    });
-  }
-
-  async updateEgg(id: number, eggData: any): Promise<ApiResponse<any>> {
-    return this.request(`/eggs/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(eggData),
-    });
-  }
-
-  async deleteEgg(id: number): Promise<ApiResponse<any>> {
-    return this.request(`/eggs/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Méthodes pour les pigeonneaux
-  async getPigeonneaux(): Promise<ApiResponse<any>> {
-    return this.request('/pigeonneaux');
-  }
-
-  async createPigeonneau(pigeonneauData: any): Promise<ApiResponse<any>> {
-    return this.request('/pigeonneaux', {
-      method: 'POST',
-      body: JSON.stringify(pigeonneauData),
-    });
-  }
-
-  async updatePigeonneau(id: number, pigeonneauData: any): Promise<ApiResponse<any>> {
-    return this.request(`/pigeonneaux/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(pigeonneauData),
-    });
-  }
-
-  async deletePigeonneau(id: number): Promise<ApiResponse<any>> {
-    return this.request(`/pigeonneaux/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Méthodes pour la santé
-  async getHealthRecords(): Promise<ApiResponse<any>> {
-    return this.request('/health');
-  }
-
-  async createHealthRecord(healthData: any): Promise<ApiResponse<any>> {
-    return this.request('/health', {
-      method: 'POST',
-      body: JSON.stringify(healthData),
-    });
-  }
-
-  async updateHealthRecord(id: number, healthData: any): Promise<ApiResponse<any>> {
-    return this.request(`/health/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(healthData),
-    });
-  }
-
-  async deleteHealthRecord(id: number): Promise<ApiResponse<any>> {
-    return this.request(`/health/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Méthodes pour les statistiques
-  async getStatistics(): Promise<ApiResponse<any>> {
-    return this.request('/statistics');
-  }
-
-  async getStatisticsByPeriod(period: string): Promise<ApiResponse<any>> {
-    return this.request(`/statistics?period=${period}`);
-  }
-
-  // Méthodes pour le tableau de bord
-  async getDashboardData(): Promise<ApiResponse<any>> {
-    return this.request('/dashboard');
-  }
-
-  // Méthodes pour les utilisateurs
-  async getUsers(): Promise<ApiResponse<any>> {
-    return this.request('/users');
-  }
-
-  async createUser(userData: any): Promise<ApiResponse<any>> {
-    return this.request('/users', {
-      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(userData),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Erreur lors de l\'inscription');
+    }
+
+    const data = await response.json();
+    return data;
   }
 
-  async updateUser(id: number, userData: any): Promise<ApiResponse<any>> {
-    return this.request(`/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(userData),
-    });
-  }
-
-  async deleteUser(id: number): Promise<ApiResponse<any>> {
-    return this.request(`/users/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Méthodes d'authentification
-  async login(credentials: { username: string; password: string }): Promise<ApiResponse<any>> {
-    return this.request('/auth/login', {
+  async login(credentials: { username: string; password: string }) {
+    const response = await fetch(`${this.baseURL}/auth/login`, {
       method: 'POST',
+      credentials: 'include', // Inclure les cookies de session
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(credentials),
     });
+
+    if (!response.ok) {
+      throw new Error('Erreur de connexion');
+    }
+
+    const data = await response.json();
+    
+    // Stocker les informations utilisateur (sans token)
+    if (data.success && data.user) {
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('sessionId', data.sessionId);
+    }
+
+    return data;
   }
 
-  async register(userData: any): Promise<ApiResponse<any>> {
-    return this.request('/auth/register', {
+  async logout() {
+    try {
+      // Appeler l'API de déconnexion
+      await fetch(`${this.baseURL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    } finally {
+      // Nettoyer le stockage local
+      localStorage.removeItem('user');
+      localStorage.removeItem('sessionId');
+    }
+  }
+
+  // Méthodes génériques CRUD
+  async get<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint);
+  }
+
+  async post<T>(endpoint: string, data: any): Promise<T> {
+    return this.request<T>(endpoint, {
       method: 'POST',
-      body: JSON.stringify(userData),
+      body: JSON.stringify(data),
     });
   }
 
-  async logout(): Promise<ApiResponse<any>> {
-    return this.request('/auth/logout', {
-      method: 'POST',
-    });
-  }
-
-  // Méthodes pour la réinitialisation de mot de passe
-  async requestPasswordReset(email: string): Promise<ApiResponse<any>> {
-    return this.request('/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  }
-
-  async resetPassword(token: string, newPassword: string): Promise<ApiResponse<any>> {
-    return this.request('/auth/reset-password', {
+  async put<T>(endpoint: string, data: any): Promise<T> {
+    return this.request<T>(endpoint, {
       method: 'PUT',
-      body: JSON.stringify({ token, newPassword }),
+      body: JSON.stringify(data),
     });
   }
 
-  // Méthodes pour la sauvegarde/restauration (admin seulement)
-  async createBackup(): Promise<ApiResponse<any>> {
-    return this.request('/backup', {
-      method: 'POST',
+  async delete<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
     });
   }
 
-  async restoreBackup(backupData: any): Promise<ApiResponse<any>> {
-    return this.request('/backup/restore', {
-      method: 'POST',
-      body: JSON.stringify(backupData),
-    });
+  // Méthodes spécifiques pour le tableau de bord
+  async getDashboardStats() {
+    return this.get('/statistics/dashboard');
   }
 
-  async getBackups(): Promise<ApiResponse<any>> {
-    return this.request('/backup');
+  async getRecentActivities(limit: number = 10) {
+    return this.get(`/statistics/recent-activities?limit=${limit}`);
+  }
+
+  // Méthodes pour la gestion des couples
+  async getCouples() {
+    return this.get('/couples');
+  }
+
+  async createCouple(coupleData: any) {
+    return this.post('/couples', coupleData);
+  }
+
+  async updateCouple(id: number, coupleData: any) {
+    return this.put(`/couples/${id}`, coupleData);
+  }
+
+  async deleteCouple(id: number) {
+    return this.delete(`/couples/${id}`);
+  }
+
+  // Méthodes pour la gestion des œufs
+  async getEggs() {
+    return this.get('/eggs');
+  }
+
+  async createEgg(eggData: any) {
+    return this.post('/eggs', eggData);
+  }
+
+  async updateEgg(id: number, eggData: any) {
+    return this.put(`/eggs/${id}`, eggData);
+  }
+
+  async deleteEgg(id: number) {
+    return this.delete(`/eggs/${id}`);
+  }
+
+  // Méthodes pour la gestion des pigeonneaux
+  async getPigeonneaux() {
+    return this.get('/pigeonneaux');
+  }
+
+  async createPigeonneau(pigeonneauData: any) {
+    return this.post('/pigeonneaux', pigeonneauData);
+  }
+
+  async updatePigeonneau(id: number, pigeonneauData: any) {
+    return this.put(`/pigeonneaux/${id}`, pigeonneauData);
+  }
+
+  async deletePigeonneau(id: number) {
+    return this.delete(`/pigeonneaux/${id}`);
+  }
+
+  // Méthodes pour la gestion de la santé
+  async getHealthRecords() {
+    return this.get('/health-records');
+  }
+
+  async createHealthRecord(healthData: any) {
+    return this.post('/health-records', healthData);
+  }
+
+  async updateHealthRecord(id: number, healthData: any) {
+    return this.put(`/health-records/${id}`, healthData);
+  }
+
+  async deleteHealthRecord(id: number) {
+    return this.delete(`/health-records/${id}`);
+  }
+
+  // Méthodes pour la gestion des ventes
+  async getSales() {
+    return this.get('/sales');
+  }
+
+  async createSale(saleData: any) {
+    return this.post('/sales', saleData);
+  }
+
+  async updateSale(id: number, saleData: any) {
+    return this.put(`/sales/${id}`, saleData);
+  }
+
+  async deleteSale(id: number) {
+    return this.delete(`/sales/${id}`);
+  }
+
+  // Méthodes pour la gestion des utilisateurs
+  async getUsers() {
+    return this.get('/users');
+  }
+
+  async createUser(userData: any) {
+    return this.post('/users', userData);
+  }
+
+  async updateUser(id: number, userData: any) {
+    return this.put(`/users/${id}`, userData);
+  }
+
+  async deleteUser(id: number) {
+    return this.delete(`/users/${id}`);
+  }
+
+  // Méthodes pour la gestion du profil
+  async getProfile() {
+    return this.get('/profile');
+  }
+
+  async updateProfile(profileData: any) {
+    return this.put('/profile', profileData);
+  }
+
+  async changePassword(passwordData: any) {
+    return this.post('/profile/change-password', passwordData);
+  }
+
+  // Méthodes pour la sécurité
+  async verifyEmail(token: string) {
+    return this.post('/auth/verify-email', { token });
+  }
+
+  async resendVerification(email: string) {
+    return this.post('/auth/resend-verification', { email });
+  }
+
+  async getCSRFToken() {
+    return this.get('/auth/csrf-token');
   }
 }
 
-// Instance exportée de l'API client
-export const api = new ApiClient(API_BASE_URL);
+// Instance unique du service API
+const apiService = new ApiService();
+
+export default apiService;
 
 // Fonctions utilitaires
 export const formatCurrency = (amount: number): string => {

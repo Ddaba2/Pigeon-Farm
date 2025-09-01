@@ -1,18 +1,27 @@
-import bcrypt from 'bcryptjs';
-import { config } from '../config/config.js';
+const bcrypt = require('bcryptjs');
+const { config } = require('../config/config.js');
+const { testDatabaseConnection } = require('../config/database.js');
 
 // Stockage temporaire des sessions (en production, utilisez Redis ou une base de données)
 const activeSessions = new Map();
 
-// Middleware d'authentification par session
-export const authenticateUser = (req, res, next) => {
+// Middleware d'authentification simple par session
+const authenticateUser = (req, res, next) => {
   try {
     // Vérifier l'authentification par session
+    // Priorité : cookies, puis en-tête x-session-id
     const sessionId = req.cookies?.sessionId || req.headers['x-session-id'];
     
-    if (!sessionId || !activeSessions.has(sessionId)) {
+    if (!sessionId) {
       return res.status(401).json({ 
-        error: 'Session invalide ou expirée',
+        error: 'Authentification requise - Aucun sessionId fourni',
+        code: 'AUTH_REQUIRED'
+      });
+    }
+    
+    if (!activeSessions.has(sessionId)) {
+      return res.status(401).json({ 
+        error: 'Session invalide',
         code: 'INVALID_SESSION'
       });
     }
@@ -41,7 +50,7 @@ export const authenticateUser = (req, res, next) => {
 };
 
 // Fonction pour créer une session
-export const createSession = (user) => {
+const createSession = (user) => {
   const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   const session = {
     user: { id: user.id, username: user.username, role: user.role },
@@ -53,12 +62,12 @@ export const createSession = (user) => {
 };
 
 // Fonction pour supprimer une session
-export const destroySession = (sessionId) => {
+const destroySession = (sessionId) => {
   activeSessions.delete(sessionId);
 };
 
 // Middleware d'autorisation par rôle
-export const requireRole = (roles) => {
+const requireRole = (roles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ 
@@ -81,13 +90,13 @@ export const requireRole = (roles) => {
 };
 
 // Middleware d'autorisation admin
-export const requireAdmin = requireRole(['admin']);
+const requireAdmin = requireRole(['admin']);
 
 // Middleware d'autorisation utilisateur ou admin
-export const requireUserOrAdmin = requireRole(['user', 'admin']);
+const requireUserOrAdmin = requireRole(['user', 'admin']);
 
 // Fonction de hachage des mots de passe
-export const hashPassword = async (password) => {
+const hashPassword = async (password) => {
   try {
     const saltRounds = config.security.bcryptRounds;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -99,7 +108,7 @@ export const hashPassword = async (password) => {
 };
 
 // Fonction de comparaison des mots de passe
-export const comparePassword = async (password, hashedPassword) => {
+const comparePassword = async (password, hashedPassword) => {
   try {
     const isMatch = await bcrypt.compare(password, hashedPassword);
     return isMatch;
@@ -110,7 +119,7 @@ export const comparePassword = async (password, hashedPassword) => {
 };
 
 // Middleware de vérification des permissions sur les ressources
-export const checkResourceOwnership = (resourceType) => {
+const checkResourceOwnership = (resourceType) => {
   return (req, res, next) => {
     try {
       if (!req.user) {
@@ -144,12 +153,14 @@ export const checkResourceOwnership = (resourceType) => {
   };
 };
 
-export default {
+module.exports = {
   authenticateUser,
   requireRole,
   requireAdmin,
   requireUserOrAdmin,
   hashPassword,
   comparePassword,
-  checkResourceOwnership
+  checkResourceOwnership,
+  createSession,
+  destroySession
 }; 

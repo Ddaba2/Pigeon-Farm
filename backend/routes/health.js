@@ -1,184 +1,156 @@
-import express from 'express';
-import { authenticateUser, requireUserOrAdmin } from '../middleware/auth.js';
-import { asyncHandler } from '../utils/errorHandler.js';
-import HealthService from '../services/healthService.js';
-
+const express = require('express');
 const router = express.Router();
+const healthService = require('../services/healthService');
+const { authenticateUser } = require('../middleware/auth');
 
-// GET /api/health-records - Récupérer tous les enregistrements de santé
-router.get('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const { pigeonId, status, page = 1, limit = 10 } = req.query;
-  const userId = req.user.id;
+// Validation pour les enregistrements de santé
+const validateHealthRecord = (data) => {
+  const errors = [];
   
-  try {
-    const filters = {};
-    if (pigeonId) filters.pigeonId = pigeonId;
-    if (status) filters.status = status;
-    
-    const result = await HealthService.getHealthRecordsByUserId(userId, parseInt(page), parseInt(limit), filters);
-    
-    res.json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    console.error('Erreur lors de la récupération des enregistrements de santé:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération des enregistrements de santé',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+  if (!data.type || !['vaccination', 'treatment', 'exam'].includes(data.type)) {
+    errors.push('Type doit être vaccination, treatment ou exam');
   }
-}));
-
-// GET /api/health-records/:id - Récupérer un enregistrement de santé par ID
-router.get('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const healthRecordId = parseInt(req.params.id);
   
+  if (!data.targetType || !['couple', 'pigeonneau'].includes(data.targetType)) {
+    errors.push('Type de cible doit être couple ou pigeonneau');
+  }
+  
+  if (!data.targetId) {
+    errors.push('ID de la cible requis');
+  }
+  
+  if (!data.product) {
+    errors.push('Produit requis');
+  }
+  
+  if (!data.date) {
+    errors.push('Date requise');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// Récupérer tous les enregistrements de santé
+router.get('/', authenticateUser, async (req, res) => {
   try {
-    const healthRecord = await HealthService.getHealthRecordById(healthRecordId);
-    
-    if (!healthRecord) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Enregistrement de santé non trouvé',
-          code: 'HEALTH_RECORD_NOT_FOUND'
-        }
-      });
+    const records = await healthService.getAllHealthRecords();
+    res.json({ success: true, data: records });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Récupérer un enregistrement de santé par ID
+router.get('/:id', authenticateUser, async (req, res) => {
+  try {
+    const record = await healthService.getHealthRecordById(req.params.id);
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Enregistrement de santé non trouvé' });
     }
-    
-    res.json({
-      success: true,
-      data: healthRecord
-    });
+    res.json({ success: true, data: record });
   } catch (error) {
-    console.error('Erreur lors de la récupération de l\'enregistrement de santé:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération de l\'enregistrement de santé',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// POST /api/health-records - Créer un nouvel enregistrement de santé
-router.post('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const healthData = req.body;
-  
+// Créer un nouvel enregistrement de santé
+router.post('/', authenticateUser, async (req, res) => {
   try {
-    const newHealthRecord = await HealthService.createHealthRecord(healthData);
-    
-    res.status(201).json({
-      success: true,
-      message: 'Enregistrement de santé créé avec succès',
-      data: newHealthRecord
-    });
-  } catch (error) {
-    console.error('Erreur lors de la création de l\'enregistrement de santé:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la création de l\'enregistrement de santé',
-        code: 'INTERNAL_ERROR'
-      }
-    });
-  }
-}));
+    const validation = validateHealthRecord(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, error: validation.errors.join(', ') });
+    }
 
-// PUT /api/health-records/:id - Mettre à jour un enregistrement de santé
-router.put('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const healthRecordId = parseInt(req.params.id);
-  const updateData = req.body;
-  
+    const newRecord = await healthService.createHealthRecord(req.body);
+    res.status(201).json({ success: true, data: newRecord });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Mettre à jour un enregistrement de santé
+router.put('/:id', authenticateUser, async (req, res) => {
   try {
-    const updatedHealthRecord = await HealthService.updateHealthRecord(healthRecordId, updateData);
-    
-    res.json({
-      success: true,
-      message: 'Enregistrement de santé mis à jour avec succès',
-      data: updatedHealthRecord
-    });
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'enregistrement de santé:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la mise à jour de l\'enregistrement de santé',
-        code: 'INTERNAL_ERROR'
-      }
-    });
-  }
-}));
+    const validation = validateHealthRecord(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, error: validation.errors.join(', ') });
+    }
 
-// DELETE /api/health-records/:id - Supprimer un enregistrement de santé
-router.delete('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const healthRecordId = parseInt(req.params.id);
-  const userId = req.user.id;
-  
+    const updatedRecord = await healthService.updateHealthRecord(req.params.id, req.body);
+    res.json({ success: true, data: updatedRecord });
+  } catch (error) {
+    if (error.message === 'Enregistrement de santé non trouvé') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Supprimer un enregistrement de santé
+router.delete('/:id', authenticateUser, async (req, res) => {
   try {
-    await HealthService.deleteHealthRecord(healthRecordId, userId);
-    
-    res.json({
-      success: true,
-      message: 'Enregistrement de santé supprimé avec succès'
-    });
+    const result = await healthService.deleteHealthRecord(req.params.id);
+    res.json({ success: true, message: result.message });
   } catch (error) {
-    console.error('Erreur lors de la suppression de l\'enregistrement de santé:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la suppression de l\'enregistrement de santé',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    if (error.message === 'Enregistrement de santé non trouvé') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// GET /api/health-records/upcoming/treatments - Traitements à venir
-router.get('/upcoming/treatments', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+// Récupérer les enregistrements de santé par cible
+router.get('/target/:targetType/:targetId', authenticateUser, async (req, res) => {
   try {
-    const upcomingTreatments = await HealthService.getUpcomingTreatments(req.user.id);
-    
-    res.json({
-      success: true,
-      data: upcomingTreatments
-    });
+    const records = await healthService.getHealthRecordsByTarget(req.params.targetType, req.params.targetId);
+    res.json({ success: true, data: records });
   } catch (error) {
-    console.error('Erreur lors de la récupération des traitements à venir:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération des traitements à venir',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// GET /api/health-records/stats/summary - Statistiques de santé
-router.get('/stats/summary', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+// Récupérer les enregistrements de santé par type
+router.get('/type/:type', authenticateUser, async (req, res) => {
   try {
-    const stats = await HealthService.getHealthStats(req.user.id);
-    
-    res.json({
-      success: true,
-      data: stats
-    });
+    const records = await healthService.getHealthRecordsByType(req.params.type);
+    res.json({ success: true, data: records });
   } catch (error) {
-    console.error('Erreur lors de la récupération des statistiques de santé:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération des statistiques de santé',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-export default router; 
+// Récupérer les enregistrements de santé récents
+router.get('/recent/:limit?', authenticateUser, async (req, res) => {
+  try {
+    const limit = req.params.limit ? parseInt(req.params.limit) : 10;
+    const records = await healthService.getRecentHealthRecords(limit);
+    res.json({ success: true, data: records });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Récupérer les enregistrements de santé à venir
+router.get('/upcoming/all', authenticateUser, async (req, res) => {
+  try {
+    const records = await healthService.getUpcomingHealthRecords();
+    res.json({ success: true, data: records });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Récupérer les statistiques des enregistrements de santé
+router.get('/stats/summary', authenticateUser, async (req, res) => {
+  try {
+    const stats = await healthService.getHealthStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+module.exports = router; 

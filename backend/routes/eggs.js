@@ -1,166 +1,131 @@
-import express from 'express';
-import { authenticateUser, requireUserOrAdmin } from '../middleware/auth.js';
-import { asyncHandler } from '../utils/errorHandler.js';
-import EggService from '../services/eggService.js';
-
+const express = require('express');
 const router = express.Router();
+const eggService = require('../services/eggService');
+const { authenticateUser } = require('../middleware/auth');
 
-// GET /api/eggs - Récupérer tous les enregistrements d'œufs
-router.get('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const { coupleId, success, page = 1, limit = 10 } = req.query;
-  const userId = req.user.id;
+// Validation pour les œufs
+const validateEgg = (data) => {
+  const errors = [];
   
-  try {
-    const filters = {};
-    if (coupleId) filters.coupleId = coupleId;
-    if (success !== undefined) filters.success = success === 'true';
-    
-    const result = await EggService.getEggsByUserId(userId, parseInt(page), parseInt(limit), filters);
-    
-    res.json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    console.error('Erreur lors de la récupération des œufs:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération des œufs',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+  if (!data.coupleId) {
+    errors.push('ID du couple requis');
   }
-}));
-
-// GET /api/eggs/:id - Récupérer un enregistrement d'œufs par ID
-router.get('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const eggId = parseInt(req.params.id);
   
+  if (!data.egg1Date) {
+    errors.push('Date du premier œuf requise');
+  }
+  
+  if (data.success1 !== undefined && typeof data.success1 !== 'boolean') {
+    errors.push('Succès du premier œuf doit être un booléen');
+  }
+  
+  if (data.success2 !== undefined && typeof data.success2 !== 'boolean') {
+    errors.push('Succès du deuxième œuf doit être un booléen');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// Récupérer tous les œufs
+router.get('/', authenticateUser, async (req, res) => {
   try {
-    const egg = await EggService.getEggById(eggId);
-    
+    const eggs = await eggService.getAllEggs();
+    res.json({ success: true, data: eggs });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Récupérer un œuf par ID
+router.get('/:id', authenticateUser, async (req, res) => {
+  try {
+    const egg = await eggService.getEggById(req.params.id);
     if (!egg) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Enregistrement d\'œufs non trouvé',
-          code: 'EGG_NOT_FOUND'
-        }
-      });
+      return res.status(404).json({ success: false, error: 'Enregistrement d\'œufs non trouvé' });
     }
-    
-    res.json({
-      success: true,
-      data: egg
-    });
+    res.json({ success: true, data: egg });
   } catch (error) {
-    console.error('Erreur lors de la récupération de l\'œuf:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération de l\'œuf',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// POST /api/eggs - Créer un nouvel enregistrement d'œufs
-router.post('/', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const eggData = req.body;
-  
+// Créer un nouvel enregistrement d'œufs
+router.post('/', authenticateUser, async (req, res) => {
   try {
-    // Créer le nouvel enregistrement
-    const newEgg = await EggService.createEgg(eggData);
-    
-    res.status(201).json({
-      success: true,
-      message: 'Enregistrement d\'œufs créé avec succès',
-      data: newEgg
-    });
-  } catch (error) {
-    console.error('Erreur lors de la création de l\'enregistrement d\'œufs:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la création de l\'enregistrement d\'œufs',
-        code: 'INTERNAL_ERROR'
-      }
-    });
-  }
-}));
+    const validation = validateEgg(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, error: validation.errors.join(', ') });
+    }
 
-// PUT /api/eggs/:id - Mettre à jour un enregistrement d'œufs
-router.put('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const eggId = parseInt(req.params.id);
-  const updateData = req.body;
-  
+    const newEgg = await eggService.createEgg(req.body);
+    res.status(201).json({ success: true, data: newEgg });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Mettre à jour un enregistrement d'œufs
+router.put('/:id', authenticateUser, async (req, res) => {
   try {
-    // Mettre à jour l'enregistrement
-    const updatedEgg = await EggService.updateEgg(eggId, updateData);
-    
-    res.json({
-      success: true,
-      message: 'Enregistrement d\'œufs mis à jour avec succès',
-      data: updatedEgg
-    });
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'enregistrement d\'œufs:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la mise à jour de l\'enregistrement d\'œufs',
-        code: 'INTERNAL_ERROR'
-      }
-    });
-  }
-}));
+    const validation = validateEgg(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, error: validation.errors.join(', ') });
+    }
 
-// DELETE /api/eggs/:id - Supprimer un enregistrement d'œufs
-router.delete('/:id', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
-  const eggId = parseInt(req.params.id);
-  const userId = req.user.id;
-  
+    const updatedEgg = await eggService.updateEgg(req.params.id, req.body);
+    res.json({ success: true, data: updatedEgg });
+  } catch (error) {
+    if (error.message === 'Enregistrement d\'œufs non trouvé') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Supprimer un enregistrement d'œufs
+router.delete('/:id', authenticateUser, async (req, res) => {
   try {
-    // Supprimer l'enregistrement
-    await EggService.deleteEgg(eggId, userId);
-    
-    res.json({
-      success: true,
-      message: 'Enregistrement d\'œufs supprimé avec succès'
-    });
+    const result = await eggService.deleteEgg(req.params.id);
+    res.json({ success: true, message: result.message });
   } catch (error) {
-    console.error('Erreur lors de la suppression de l\'enregistrement d\'œufs:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la suppression de l\'enregistrement d\'œufs',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    if (error.message === 'Enregistrement d\'œufs non trouvé') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-// GET /api/eggs/stats/summary - Statistiques des œufs
-router.get('/stats/summary', authenticateUser, requireUserOrAdmin, asyncHandler(async (req, res) => {
+// Récupérer les œufs par couple
+router.get('/couple/:coupleId', authenticateUser, async (req, res) => {
   try {
-    const stats = await EggService.getEggStats(req.user.id);
-    
-    res.json({
-      success: true,
-      data: stats
-    });
+    const eggs = await eggService.getEggsByCouple(req.params.coupleId);
+    res.json({ success: true, data: eggs });
   } catch (error) {
-    console.error('Erreur lors de la récupération des statistiques:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la récupération des statistiques',
-        code: 'INTERNAL_ERROR'
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
-}));
+});
 
-export default router; 
+// Récupérer les statistiques des œufs
+router.get('/stats/summary', authenticateUser, async (req, res) => {
+  try {
+    const stats = await eggService.getEggStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Récupérer le taux de réussite des œufs
+router.get('/stats/success-rate', authenticateUser, async (req, res) => {
+  try {
+    const successRate = await eggService.getSuccessRate();
+    res.json({ success: true, data: successRate });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+module.exports = router; 

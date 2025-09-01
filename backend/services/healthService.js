@@ -1,238 +1,269 @@
-import { executeQuery, executeTransaction } from '../config/database.js';
+const { executeQuery } = require('../config/database');
 
-export class HealthService {
-  // Créer un nouvel enregistrement de santé
-  static async createHealthRecord(healthData) {
-    const { 
-      type, 
-      targetType, 
-      targetId, 
-      product, 
-      date, 
-      nextDue, 
-      observations,
-      userId 
-    } = healthData;
-    
+class HealthService {
+  // Récupérer tous les enregistrements de santé
+  async getAllHealthRecords() {
     try {
-      const sql = `
-        INSERT INTO health_records (type, target_type, target_id, product, date, next_due, observations, user_id, created_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-      `;
-      
-      const result = await executeQuery(sql, [
-        type, targetType, targetId, product, date, nextDue, observations, userId
-      ]);
-      
-      // Récupérer l'enregistrement créé
-      const newRecord = await this.getHealthRecordById(result.insertId);
-      return newRecord;
+      const rows = await executeQuery(`
+        SELECT 
+          h.id,
+          h.type,
+          h.targetType,
+          h.targetId,
+          h.product,
+          h.date,
+          h.nextDue,
+          h.observations,
+          h.created_at,
+          h.updated_at,
+          CASE 
+            WHEN h.targetType = 'couple' THEN c.nestNumber
+            WHEN h.targetType = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
+            ELSE 'Inconnu'
+          END as targetName
+        FROM healthRecords h
+        LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
+        LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
+        ORDER BY h.created_at DESC
+      `);
+      return rows;
     } catch (error) {
-      console.error('Erreur lors de la création de l\'enregistrement de santé:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération des enregistrements de santé: ${error.message}`);
     }
   }
 
   // Récupérer un enregistrement de santé par ID
-  static async getHealthRecordById(id) {
+  async getHealthRecordById(id) {
     try {
-      const sql = `
-        SELECT h.*, 
-               CASE 
-                 WHEN h.target_type = 'couple' THEN c.name
-                 WHEN h.target_type = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
-                 ELSE 'N/A'
-               END as target_name
-        FROM health_records h 
-        LEFT JOIN couples c ON h.target_type = 'couple' AND h.target_id = c.id
-        LEFT JOIN pigeonneaux p ON h.target_type = 'pigeonneau' AND h.target_id = p.id
+      const rows = await executeQuery(`
+        SELECT 
+          h.id,
+          h.type,
+          h.targetType,
+          h.targetId,
+          h.product,
+          h.date,
+          h.nextDue,
+          h.observations,
+          h.created_at,
+          h.updated_at,
+          CASE 
+            WHEN h.targetType = 'couple' THEN c.nestNumber
+            WHEN h.targetType = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
+            ELSE 'Inconnu'
+          END as targetName
+        FROM healthRecords h
+        LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
+        LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
         WHERE h.id = ?
-      `;
-      const records = await executeQuery(sql, [id]);
-      return records[0] || null;
+      `, [id]);
+      
+      return rows[0];
     } catch (error) {
-      console.error('Erreur lors de la récupération de l\'enregistrement de santé:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération de l'enregistrement de santé: ${error.message}`);
     }
   }
 
-  // Récupérer tous les enregistrements de santé d'un utilisateur
-  static async getHealthRecordsByUserId(userId, page = 1, limit = 10, filters = {}) {
+  // Créer un nouvel enregistrement de santé
+  async createHealthRecord(healthData) {
     try {
-      let sql = `
-        SELECT h.*, 
-               CASE 
-                 WHEN h.target_type = 'couple' THEN c.name
-                 WHEN h.target_type = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
-                 ELSE 'N/A'
-               END as target_name
-        FROM health_records h 
-        LEFT JOIN couples c ON h.target_type = 'couple' AND h.target_id = c.id
-        LEFT JOIN pigeonneaux p ON h.target_type = 'pigeonneau' AND h.target_id = p.id
-        WHERE h.user_id = ?
-      `;
+      const { type, targetType, targetId, product, date, nextDue, observations } = healthData;
       
-      const params = [userId];
+      const result = await executeQuery(`
+        INSERT INTO healthRecords (type, targetType, targetId, product, date, nextDue, observations, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `, [type, targetType, targetId, product, date, nextDue, observations]);
       
-      // Ajouter les filtres
-      if (filters.type) {
-        sql += ' AND h.type = ?';
-        params.push(filters.type);
-      }
-      
-      if (filters.targetType) {
-        sql += ' AND h.target_type = ?';
-        params.push(filters.targetType);
-      }
-      
-      if (filters.product) {
-        sql += ' AND h.product LIKE ?';
-        params.push(`%${filters.product}%`);
-      }
-      
-      sql += ' ORDER BY h.date DESC LIMIT ? OFFSET ?';
-      params.push(limit, (page - 1) * limit);
-      
-      const records = await executeQuery(sql, params);
-      
-      // Compter le total
-      let countSql = `
-        SELECT COUNT(*) as total 
-        FROM health_records 
-        WHERE user_id = ?
-      `;
-      const countParams = [userId];
-      
-      if (filters.type) {
-        countSql += ' AND type = ?';
-        countParams.push(filters.type);
-      }
-      
-      if (filters.targetType) {
-        countSql += ' AND target_type = ?';
-        countParams.push(filters.targetType);
-      }
-      
-      if (filters.product) {
-        countSql += ' AND product LIKE ?';
-        countParams.push(`%${filters.product}%`);
-      }
-      
-      const [{ total }] = await executeQuery(countSql, countParams);
-      
-      return {
-        records,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
-          totalRecords: total,
-          hasNextPage: (page - 1) * limit + limit < total,
-          hasPrevPage: page > 1
-        }
-      };
+      return { id: result.insertId, ...healthData };
     } catch (error) {
-      console.error('Erreur lors de la récupération des enregistrements de santé:', error);
-      throw error;
+      throw new Error(`Erreur lors de la création de l'enregistrement de santé: ${error.message}`);
     }
   }
 
   // Mettre à jour un enregistrement de santé
-  static async updateHealthRecord(id, updateData) {
+  async updateHealthRecord(id, healthData) {
     try {
-      const fields = [];
-      const values = [];
+      const { type, targetType, targetId, product, date, nextDue, observations } = healthData;
       
-      // Construire dynamiquement la requête UPDATE
-      Object.keys(updateData).forEach(key => {
-        if (key !== 'id' && key !== 'user_id') {
-          fields.push(`${key} = ?`);
-          values.push(updateData[key]);
-        }
-      });
+      const result = await executeQuery(`
+        UPDATE healthRecords 
+        SET type = ?, targetType = ?, targetId = ?, product = ?, date = ?, nextDue = ?, observations = ?, updated_at = NOW()
+        WHERE id = ?
+      `, [type, targetType, targetId, product, date, nextDue, observations, id]);
       
-      if (fields.length === 0) {
-        throw new Error('Aucun champ à mettre à jour');
+      if (result.affectedRows === 0) {
+        throw new Error('Enregistrement de santé non trouvé');
       }
       
-      values.push(id);
-      
-      const sql = `UPDATE health_records SET ${fields.join(', ')} WHERE id = ?`;
-      await executeQuery(sql, values);
-      
-      // Récupérer l'enregistrement mis à jour
-      const updatedRecord = await this.getHealthRecordById(id);
-      return updatedRecord;
+      return { id, ...healthData };
     } catch (error) {
-      console.error('Erreur lors de la mise à jour de l\'enregistrement de santé:', error);
-      throw error;
+      throw new Error(`Erreur lors de la mise à jour de l'enregistrement de santé: ${error.message}`);
     }
   }
 
   // Supprimer un enregistrement de santé
-  static async deleteHealthRecord(id, userId) {
+  async deleteHealthRecord(id) {
     try {
-      // Vérifier que l'utilisateur est propriétaire
-      const record = await this.getHealthRecordById(id);
-      if (!record || record.user_id !== userId) {
-        throw new Error('Enregistrement non trouvé ou accès non autorisé');
+      const [result] = await db.execute('DELETE FROM healthRecords WHERE id = ?', [id]);
+      
+      if (result.affectedRows === 0) {
+        throw new Error('Enregistrement de santé non trouvé');
       }
       
-      const sql = 'DELETE FROM health_records WHERE id = ?';
-      await executeQuery(sql, [id]);
-      
-      return true;
+      return { message: 'Enregistrement de santé supprimé avec succès' };
     } catch (error) {
-      console.error('Erreur lors de la suppression de l\'enregistrement de santé:', error);
-      throw error;
+      throw new Error(`Erreur lors de la suppression de l'enregistrement de santé: ${error.message}`);
     }
   }
 
-  // Récupérer les traitements à venir
-  static async getUpcomingTreatments(userId) {
+  // Récupérer les enregistrements de santé par cible
+  async getHealthRecordsByTarget(targetType, targetId) {
     try {
-      const sql = `
-        SELECT h.*, 
-               CASE 
-                 WHEN h.target_type = 'couple' THEN c.name
-                 WHEN h.target_type = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
-                 ELSE 'N/A'
-               END as target_name
-        FROM health_records h 
-        LEFT JOIN couples c ON h.target_type = 'couple' AND h.target_id = c.id
-        LEFT JOIN pigeonneaux p ON h.target_type = 'pigeonneau' AND h.target_id = p.id
-        WHERE h.user_id = ? AND h.next_due >= CURDATE()
-        ORDER BY h.next_due ASC
-      `;
-      
-      const records = await executeQuery(sql, [userId]);
-      return records;
-    } catch (error) {
-      console.error('Erreur lors de la récupération des traitements à venir:', error);
-      throw error;
-    }
-  }
-
-  // Récupérer les statistiques de santé
-  static async getHealthStats(userId) {
-    try {
-      const sql = `
+      const [rows] = await db.execute(`
         SELECT 
-          COUNT(*) as total_records,
-          COUNT(DISTINCT type) as unique_treatments,
-          COUNT(DISTINCT target_type) as target_types,
-          COUNT(CASE WHEN next_due >= CURDATE() THEN 1 END) as upcoming_treatments,
-          COUNT(CASE WHEN next_due < CURDATE() THEN 1 END) as overdue_treatments
-        FROM health_records 
-        WHERE user_id = ?
-      `;
+          h.id,
+          h.type,
+          h.targetType,
+          h.targetId,
+          h.product,
+          h.date,
+          h.nextDue,
+          h.observations,
+          h.created_at,
+          h.updated_at,
+          CASE 
+            WHEN h.targetType = 'couple' THEN c.nestNumber
+            WHEN h.targetType = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
+            ELSE 'Inconnu'
+          END as targetName
+        FROM healthRecords h
+        LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
+        LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
+        WHERE h.targetType = ? AND h.targetId = ?
+        ORDER BY h.created_at DESC
+      `, [targetType, targetId]);
       
-      const [stats] = await executeQuery(sql, [userId]);
-      return stats;
+      return rows;
     } catch (error) {
-      console.error('Erreur lors de la récupération des statistiques de santé:', error);
-      throw error;
+      throw new Error(`Erreur lors de la récupération des enregistrements de santé: ${error.message}`);
+    }
+  }
+
+  // Compter les enregistrements de santé par type
+  async getHealthStats() {
+    try {
+      const [rows] = await db.execute(`
+        SELECT 
+          type,
+          COUNT(*) as count
+        FROM healthRecords
+        GROUP BY type
+      `);
+      
+      return rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des statistiques: ${error.message}`);
+    }
+  }
+
+  // Récupérer les enregistrements de santé par type
+  async getHealthRecordsByType(type) {
+    try {
+      const [rows] = await db.execute(`
+        SELECT 
+          h.id,
+          h.type,
+          h.targetType,
+          h.targetId,
+          h.product,
+          h.date,
+          h.nextDue,
+          h.observations,
+          h.created_at,
+          h.updated_at,
+          CASE 
+            WHEN h.targetType = 'couple' THEN c.nestNumber
+            WHEN h.targetType = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
+            ELSE 'Inconnu'
+          END as targetName
+        FROM healthRecords h
+        LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
+        LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
+        WHERE h.type = ?
+        ORDER BY h.created_at DESC
+      `, [type]);
+      
+      return rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des enregistrements de santé: ${error.message}`);
+    }
+  }
+
+  // Récupérer les enregistrements de santé récents
+  async getRecentHealthRecords(limit = 10) {
+    try {
+      const [rows] = await db.execute(`
+        SELECT 
+          h.id,
+          h.type,
+          h.targetType,
+          h.targetId,
+          h.product,
+          h.date,
+          h.nextDue,
+          h.observations,
+          h.created_at,
+          h.updated_at,
+          CASE 
+            WHEN h.targetType = 'couple' THEN c.nestNumber
+            WHEN h.targetType = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
+            ELSE 'Inconnu'
+          END as targetName
+        FROM healthRecords h
+        LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
+        LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
+        ORDER BY h.created_at DESC
+        LIMIT ?
+      `, [limit]);
+      
+      return rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des enregistrements récents: ${error.message}`);
+    }
+  }
+
+  // Récupérer les enregistrements de santé à venir (nextDue)
+  async getUpcomingHealthRecords() {
+    try {
+      const [rows] = await db.execute(`
+        SELECT 
+          h.id,
+          h.type,
+          h.targetType,
+          h.targetId,
+          h.product,
+          h.date,
+          h.nextDue,
+          h.observations,
+          h.created_at,
+          h.updated_at,
+          CASE 
+            WHEN h.targetType = 'couple' THEN c.nestNumber
+            WHEN h.targetType = 'pigeonneau' THEN CONCAT('Pigeonneau #', p.id)
+            ELSE 'Inconnu'
+          END as targetName
+        FROM healthRecords h
+        LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
+        LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
+        WHERE h.nextDue IS NOT NULL AND h.nextDue >= CURDATE()
+        ORDER BY h.nextDue ASC
+      `);
+      
+      return rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des enregistrements à venir: ${error.message}`);
     }
   }
 }
 
-export default HealthService; 
+module.exports = new HealthService(); 

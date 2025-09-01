@@ -105,7 +105,10 @@ function App() {
       case 'help':
         return <Documentation />;
       default:
-        return <Dashboard />;
+        return <div className="p-8 text-center">
+          <h1 className="text-2xl font-bold mb-4">Page Non Trouvée</h1>
+          <p className="text-gray-600">Cette page n'existe pas ou a été supprimée</p>
+        </div>;
     }
   };
 

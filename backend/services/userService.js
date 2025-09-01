@@ -1,7 +1,7 @@
-import { executeQuery, executeTransaction } from '../config/database.js';
-import bcrypt from 'bcrypt';
+const { executeQuery, executeTransaction } = require('../config/database.js');
+const bcrypt = require('bcrypt');
 
-export class UserService {
+class UserService {
   // Créer un nouvel utilisateur
   static async createUser(userData) {
     const { username, email, password, fullName, role = 'user' } = userData;
@@ -174,4 +174,4 @@ export class UserService {
   }
 }
 
-export default UserService; 
+module.exports = UserService; 

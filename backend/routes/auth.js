@@ -1,15 +1,18 @@
-import express from 'express';
-import { 
+const express = require('express');
+const { 
   hashPassword, 
   comparePassword,
   createSession,
   destroySession
-} from '../middleware/auth.js';
-import { validateUser } from '../utils/validation.js';
-import { asyncHandler } from '../utils/errorHandler.js';
-import UserService from '../services/userService.js';
+} = require('../middleware/auth.js');
+const { testDatabaseConnection } = require('../config/database.js');
+const { validateUser } = require('../utils/validation.js');
+const { asyncHandler } = require('../utils/errorHandler.js');
+const UserService = require('../services/userService.js');
 
 const router = express.Router();
+
+// Service d'authentification - Base de données MySQL uniquement
 
 // Route d'inscription
 router.post('/register', asyncHandler(async (req, res) => {
@@ -32,6 +35,8 @@ router.post('/register', asyncHandler(async (req, res) => {
       }
     });
   }
+  
+
   
   // Vérifier si l'utilisateur existe déjà
   const userExists = await UserService.userExists(username, email);
@@ -103,28 +108,28 @@ router.post('/login', asyncHandler(async (req, res) => {
     });
   }
   
-  // Mettre à jour la dernière connexion dans la base de données
-  await UserService.updateLastLogin(user.id);
-  
   // Créer une session
   const sessionId = createSession(user);
   
   // Définir le cookie de session
   res.cookie('sessionId', sessionId, {
     httpOnly: true,
-    secure: false, // Mettre à true en production avec HTTPS
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: 24 * 60 * 60 * 1000 // 24 heures
   });
   
-  // Retourner la réponse (sans le mot de passe)
-  const { password: _, ...userWithoutPassword } = user;
-  
   res.json({
     success: true,
     message: 'Connexion réussie',
-    user: userWithoutPassword,
-    sessionId: sessionId
+    user: {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role
+    },
+    sessionId
   });
 }));
 
@@ -280,4 +285,4 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
   });
 }));
 
-export default router; 
+module.exports = router; 

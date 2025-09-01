@@ -1,8 +1,8 @@
-import mysql from 'mysql2/promise';
-import { config } from './config.js';
+const mysql = require('mysql2/promise');
+const { config } = require('./config.js');
 
 // Configuration de la connexion MySQL
-export const dbConfig = {
+const dbConfig = {
   host: config.database.host,
   user: config.database.user,
   password: config.database.password,
@@ -14,10 +14,10 @@ export const dbConfig = {
 };
 
 // Création du pool de connexions
-export const pool = mysql.createPool(dbConfig);
+const pool = mysql.createPool(dbConfig);
 
 // Test de connexion à la base de données
-export const testDatabaseConnection = async () => {
+const testDatabaseConnection = async () => {
   try {
     const connection = await pool.getConnection();
     console.log('✅ Connexion à MySQL réussie !');
@@ -47,7 +47,7 @@ export const testDatabaseConnection = async () => {
 };
 
 // Fonction pour exécuter des requêtes
-export const executeQuery = async (sql, params = []) => {
+const executeQuery = async (sql, params = []) => {
   try {
     const [rows] = await pool.execute(sql, params);
     return rows;
@@ -58,7 +58,7 @@ export const executeQuery = async (sql, params = []) => {
 };
 
 // Fonction pour exécuter des requêtes avec transaction
-export const executeTransaction = async (queries) => {
+const executeTransaction = async (queries) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -79,9 +79,11 @@ export const executeTransaction = async (queries) => {
   }
 };
 
-export default {
+module.exports = {
   pool,
   testDatabaseConnection,
   executeQuery,
-  executeTransaction
+  executeTransaction,
+  dbConfig,
+  execute: executeQuery
 }; 

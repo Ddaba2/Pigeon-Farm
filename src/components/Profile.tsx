@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '../utils/api';
+import apiService from '../utils/api';
 import { User, Edit, Save, Trash2, Eye, EyeOff } from 'lucide-react';
 import { safeLocalStorage } from '../utils/edgeCompatibility';
 
@@ -31,7 +31,7 @@ function Profile() {
     setError(null);
     
     try {
-      const data = await api.getProfile();
+      const data = await apiService.getProfile();
       if (data && typeof data === 'object') {
         setUser(data);
         setFormData({
@@ -88,7 +88,7 @@ function Profile() {
         updateData.newPassword = formData.newPassword;
       }
 
-      await api.updateProfile(updateData);
+              await apiService.updateProfile(updateData);
       
       setEditing(false);
       setFormData({
@@ -115,7 +115,7 @@ function Profile() {
     setError(null);
 
     try {
-      await api.deleteAccount();
+              await apiService.deleteAccount();
       safeLocalStorage.removeItem('token');
       window.location.href = '/login';
     } catch (err: any) {

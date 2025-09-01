@@ -161,8 +161,7 @@ const server = app.listen(port, async () => {
       console.log('⚠️ Base de données non connectée - Mode démo activé');
     }
   } catch (error) {
-    console.error('❌ Erreur lors du test de connexion:', error);
-    console.log('⚠️ Mode démo activé');
+    console.log('⚠️ Erreur lors du test de connexion - Mode démo activé');
   }
 });
 
@@ -183,4 +182,6 @@ const gracefulShutdown = (signal) => {
 };
 
 process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown); 
+process.on('SIGINT', gracefulShutdown);
+
+export default app; 

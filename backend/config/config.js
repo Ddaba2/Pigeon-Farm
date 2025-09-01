@@ -1,14 +1,10 @@
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const dotenv = require('dotenv');
+const path = require('path');
 
 // Charger les variables d'environnement
 dotenv.config({ path: path.join(__dirname, '../config.env') });
 
-export const config = {
+const config = {
   // Configuration du serveur
   port: process.env.PORT || 3002,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -36,4 +32,4 @@ export const config = {
   }
 };
 
-export default config; 
+module.exports = { config }; 
