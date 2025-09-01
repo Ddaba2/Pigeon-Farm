@@ -49,35 +49,68 @@ const PigeonnalManagement: React.FC = () => {
     observations: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingPigeonneau) {
-      setPigeonneaux(pigeonneaux.map(p => 
-        p.id === editingPigeonneau.id 
-          ? { 
-              ...formData, 
-              id: p.id,
-              coupleId: parseInt(formData.coupleId),
-              weight: parseFloat(formData.weight) || 0,
-              salePrice: formData.salePrice ? parseFloat(formData.salePrice) : undefined
-            }
-          : p
-      ));
+    try {
+      // Validation côté frontend
+      if (!formData.coupleId || isNaN(parseInt(formData.coupleId))) {
+        alert('Veuillez entrer un ID de couple valide');
+        return;
+      }
+
+      if (!formData.birthDate) {
+        alert('Veuillez entrer une date de naissance');
+        return;
+      }
+
+      if (!formData.weight || isNaN(parseFloat(formData.weight))) {
+        alert('Veuillez entrer un poids valide');
+        return;
+      }
+
+      // Transformer les données pour le backend
+      const backendData = {
+        coupleId: parseInt(formData.coupleId),
+        eggRecordId: null, // Pour l'instant, on peut laisser null
+        birthDate: formData.birthDate,
+        sex: formData.sex,
+        weight: parseFloat(formData.weight),
+        weaningDate: null, // Optionnel
+        status: formData.status,
+        salePrice: formData.salePrice ? parseFloat(formData.salePrice) : null,
+        saleDate: null, // Optionnel
+        buyer: null, // Optionnel
+        observations: formData.observations
+      };
+
+      console.log('🔍 Frontend - Données envoyées:', JSON.stringify(backendData, null, 2));
+
+      if (editingPigeonneau) {
+        // Modification
+        const response = await apiService.updatePigeonneau(editingPigeonneau.id, backendData);
+        if (response.success) {
+          setPigeonneaux(pigeonneaux.map(p => 
+            p.id === editingPigeonneau.id 
+              ? response.data
+              : p
+          ));
+        }
       } else {
-        const newPigeonneau: Pigeonneau = {
-          ...formData,
-        id: Math.max(...pigeonneaux.map(p => p.id)) + 1,
-          coupleId: parseInt(formData.coupleId),
-        weight: parseFloat(formData.weight) || 0,
-        salePrice: formData.salePrice ? parseFloat(formData.salePrice) : undefined
-        };
-        setPigeonneaux([...pigeonneaux, newPigeonneau]);
+        // Ajout
+        const response = await apiService.createPigeonneau(backendData);
+        if (response.success) {
+          setPigeonneaux([...pigeonneaux, response.data]);
+        }
       }
       
-    setShowModal(false);
-    setEditingPigeonneau(null);
-    resetForm();
+      setShowModal(false);
+      setEditingPigeonneau(null);
+      resetForm();
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      alert('Erreur lors de la sauvegarde du pigeonneau');
+    }
   };
 
   const handleEdit = (pigeonneau: Pigeonneau) => {
@@ -95,9 +128,17 @@ const PigeonnalManagement: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce pigeonneau ?')) {
-      setPigeonneaux(pigeonneaux.filter(p => p.id !== id));
+      try {
+        const response = await apiService.deletePigeonneau(id);
+        if (response.success) {
+          setPigeonneaux(pigeonneaux.filter(p => p.id !== id));
+        }
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du pigeonneau');
+      }
     }
   };
 
@@ -115,7 +156,7 @@ const PigeonnalManagement: React.FC = () => {
   };
 
   const filteredPigeonneaux = pigeonneaux.filter(pigeonneau => {
-    const matchesSearch = pigeonneau.coupleName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (pigeonneau.coupleName || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || pigeonneau.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -213,7 +254,7 @@ const PigeonnalManagement: React.FC = () => {
               {filteredPigeonneaux.map((pigeonneau) => (
                 <tr key={pigeonneau.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{pigeonneau.coupleName}</div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{pigeonneau.coupleName || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">
