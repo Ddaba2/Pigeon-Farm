@@ -16,6 +16,10 @@ class StatisticsService {
       // Compter les enregistrements de santé
       const healthCount = await executeQuery('SELECT COUNT(*) as total FROM healthRecords');
       
+      // Compter les ventes
+      const salesCount = await executeQuery('SELECT COUNT(*) as total FROM sales');
+      const salesRevenue = await executeQuery('SELECT SUM(total_amount) as total FROM sales');
+      
       // Compter les couples par statut
       const couplesByStatus = await executeQuery(`
         SELECT 
@@ -63,27 +67,32 @@ class StatisticsService {
       
       // Activités récentes (derniers enregistrements)
       const recentActivities = await executeQuery(`
-        (SELECT 'couple' as type, nestNumber as description, created_at as date, id
+        (SELECT 'couple' as type, nestNumber as description, created_at as date, id, 'Users' as icon
          FROM couples
          ORDER BY created_at DESC
          LIMIT 2)
         UNION ALL
-        (SELECT 'egg' as type, CONCAT('Œufs pour couple #', coupleId) as description, createdAt as date, id
+        (SELECT 'egg' as type, CONCAT('Œufs pour couple #', coupleId) as description, createdAt as date, id, 'FileText' as icon
          FROM eggs
          ORDER BY createdAt DESC
          LIMIT 2)
         UNION ALL
-        (SELECT 'pigeonneau' as type, CONCAT('Pigeonneau #', id) as description, created_at as date, id
+        (SELECT 'pigeonneau' as type, CONCAT('Pigeonneau #', id) as description, created_at as date, id, 'Activity' as icon
          FROM pigeonneaux
          ORDER BY created_at DESC
          LIMIT 2)
         UNION ALL
-        (SELECT 'health' as type, CONCAT(type, ' - ', product) as description, created_at as date, id
+        (SELECT 'health' as type, CONCAT(type, ' - ', product) as description, created_at as date, id, 'Heart' as icon
          FROM healthRecords
          ORDER BY created_at DESC
          LIMIT 2)
+        UNION ALL
+        (SELECT 'sale' as type, CONCAT('Vente ', target_type, ' - ', buyer_name, ' (', total_amount, ' XOF)') as description, date as date, id, 'DollarSign' as icon
+         FROM sales
+         ORDER BY date DESC, created_at DESC
+         LIMIT 2)
         ORDER BY date DESC
-        LIMIT 8
+        LIMIT 10
       `);
       
       return {
@@ -91,6 +100,8 @@ class StatisticsService {
         totalEggs: eggsCount[0].total,
         totalPigeonneaux: pigeonneauxCount[0].total,
         totalHealthRecords: healthCount[0].total,
+        totalSales: salesCount[0].total,
+        totalRevenue: salesRevenue[0].total || 0,
         couplesByStatus,
         eggsBySuccess,
         pigeonneauxByStatus,
@@ -141,13 +152,12 @@ class StatisticsService {
       // Statistiques des ventes
       const salesStats = await executeQuery(`
         SELECT 
-          COUNT(*) as totalSold,
-          SUM(salePrice) as totalRevenue,
-          AVG(salePrice) as averagePrice,
-          MAX(salePrice) as maxPrice,
-          MIN(salePrice) as minPrice
-        FROM pigeonneaux
-        WHERE status = 'sold' AND salePrice IS NOT NULL
+          COUNT(*) as total,
+          SUM(total_amount) as totalRevenue,
+          AVG(total_amount) as averagePrice,
+          MAX(total_amount) as maxPrice,
+          MIN(total_amount) as minPrice
+        FROM sales
       `);
       
       // Statistiques de santé

@@ -41,7 +41,6 @@ const HealthTracking: React.FC = () => {
     type: 'vaccination',
     targetType: 'couple' as const,
     targetId: '',
-    targetName: '',
     product: '',
     date: new Date().toISOString().split('T')[0],
     observations: ''
@@ -52,8 +51,14 @@ const HealthTracking: React.FC = () => {
     
     try {
       // Validation côté frontend
-      if (!formData.targetId || isNaN(parseInt(formData.targetId))) {
+      if (!formData.targetId || formData.targetId.trim() === '') {
         alert('Veuillez entrer un ID de cible valide');
+        return;
+      }
+
+      // Validation spécifique selon le type de cible
+      if (formData.targetType === 'pigeonneau' && isNaN(parseInt(formData.targetId))) {
+        alert('Veuillez entrer un ID de pigeonneau valide (numérique)');
         return;
       }
 
@@ -71,7 +76,7 @@ const HealthTracking: React.FC = () => {
       const backendData = {
         type: formData.type,
         targetType: formData.targetType,
-        targetId: parseInt(formData.targetId),
+        targetId: formData.targetType === 'couple' ? formData.targetId.trim() : parseInt(formData.targetId),
         product: formData.product,
         date: formData.date,
         observations: formData.observations
@@ -112,7 +117,6 @@ const HealthTracking: React.FC = () => {
       type: record.type,
       targetType: record.targetType,
       targetId: record.targetId.toString(),
-      targetName: record.targetName || '',
       product: record.product || '',
       date: formatDateForInput(record.date),
       observations: record.observations || ''
@@ -149,7 +153,6 @@ const HealthTracking: React.FC = () => {
       type: 'vaccination',
       targetType: 'couple',
       targetId: '',
-      targetName: '',
       product: '',
       date: new Date().toISOString().split('T')[0],
       observations: ''
@@ -193,52 +196,7 @@ const HealthTracking: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Search className="h-4 w-4 inline mr-1" />
-              Recherche
-            </label>
-            <input
-              type="text"
-              placeholder="Rechercher..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Filter className="h-4 w-4 inline mr-1" />
-              Type
-            </label>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="all">Tous les types</option>
-              <option value="vaccination">Vaccination</option>
-              <option value="traitement">Traitement</option>
-              <option value="examen">Examen</option>
-            </select>
-          </div>
-          
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setTypeFilter('all');
-              }}
-              className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors"
-            >
-              Réinitialiser
-            </button>
-          </div>
-        </div>
-      </div>
+
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="overflow-x-auto">
@@ -346,24 +304,16 @@ const HealthTracking: React.FC = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ID de la cible *</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    {formData.targetType === 'couple' ? 'ID/numéro de cage *' : 'ID de la cible *'}
+                  </label>
                   <input
-                    type="number"
+                    type={formData.targetType === 'couple' ? 'text' : 'number'}
                     required
                     value={formData.targetId}
                     onChange={(e) => setFormData({...formData, targetId: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nom de la cible *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.targetName}
-                    onChange={(e) => setFormData({...formData, targetName: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
+                    placeholder={formData.targetType === 'couple' ? 'Ex: CO0, A82' : 'Ex: 1'}
                   />
                 </div>
               </div>

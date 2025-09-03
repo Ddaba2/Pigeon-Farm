@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Users, FileText, Activity, Heart, TrendingUp, Calendar, Clock } from 'lucide-react';
+import { BarChart3, Users, FileText, Activity, Heart, TrendingUp, Calendar, Clock, DollarSign } from 'lucide-react';
 import apiService from '../utils/api';
+import { useNavigate } from 'react-router-dom';
 
 interface DashboardStats {
   totalCouples: number;
   totalEggs: number;
   totalPigeonneaux: number;
-  healthRecords: number;
+  totalHealthRecords: number;
+  totalSales: number;
+  totalRevenue: number;
   recentActivities: Array<{
   id: number;
     type: string;
@@ -17,11 +20,14 @@ interface DashboardStats {
 }
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalCouples: 0,
     totalEggs: 0,
     totalPigeonneaux: 0,
-    healthRecords: 0,
+    totalHealthRecords: 0,
+    totalSales: 0,
+    totalRevenue: 0,
     recentActivities: []
   });
 
@@ -35,7 +41,9 @@ const Dashboard: React.FC = () => {
             totalCouples: response.data.totalCouples || 0,
             totalEggs: response.data.totalEggs || 0,
             totalPigeonneaux: response.data.totalPigeonneaux || 0,
-            healthRecords: response.data.totalHealthRecords || 0,
+            totalHealthRecords: response.data.totalHealthRecords || 0,
+            totalSales: response.data.totalSales || 0,
+            totalRevenue: response.data.totalRevenue || 0,
             recentActivities: response.data.recentActivities || []
           });
         }
@@ -53,6 +61,7 @@ const Dashboard: React.FC = () => {
       case 'FileText': return <FileText className="h-4 w-4" />;
       case 'Activity': return <Activity className="h-4 w-4" />;
       case 'Heart': return <Heart className="h-4 w-4" />;
+      case 'DollarSign': return <DollarSign className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };
@@ -79,7 +88,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Widgets de statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center">
             <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
@@ -123,77 +132,85 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Santé</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.healthRecords}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalHealthRecords}</p>
+              </div>
+            </div>
+          </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center">
+            <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+              <DollarSign className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Ventes</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalSales}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{stats.totalRevenue?.toLocaleString('fr-FR') || '0'} XOF</p>
               </div>
             </div>
           </div>
         </div>
 
-      {/* Graphique et activités récentes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Graphique simple */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Évolution mensuelle</h3>
-          <div className="h-64 flex items-end justify-center space-x-2">
-            <div className="bg-blue-500 rounded-t w-8 h-20"></div>
-            <div className="bg-green-500 rounded-t w-8 h-32"></div>
-            <div className="bg-purple-500 rounded-t w-8 h-24"></div>
-            <div className="bg-red-500 rounded-t w-8 h-28"></div>
-            <div className="bg-yellow-500 rounded-t w-8 h-36"></div>
-            <div className="bg-indigo-500 rounded-t w-8 h-16"></div>
+      {/* Activités récentes */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Activités récentes</h3>
+        <div className="space-y-4">
+          {stats.recentActivities.slice(0, 5).map((activity, index) => (
+            <div key={`${activity.type}-${activity.id}-${index}`} className="flex items-start space-x-3">
+              <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                {getIcon(activity.icon)}
                 </div>
-          <div className="flex justify-center space-x-4 mt-4 text-sm text-gray-600 dark:text-gray-400">
-            <span>Jan</span>
-            <span>Fév</span>
-            <span>Mar</span>
-            <span>Avr</span>
-            <span>Mai</span>
-            <span>Juin</span>
-          </div>
-        </div>
-
-        {/* Activités récentes */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Activités récentes</h3>
-          <div className="space-y-4">
-            {stats.recentActivities.map((activity, index) => (
-              <div key={`${activity.type}-${activity.id}-${index}`} className="flex items-start space-x-3">
-                <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                  {getIcon(activity.icon)}
-                  </div>
-                <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {activity.description}
-                    </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatDate(activity.date)}
-                    </p>
-                  </div>
-                  </div>
-            ))}
-              </div>
+              <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {activity.description}
+                  </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {formatDate(activity.date)}
+                  </p>
+                </div>
+                </div>
+          ))}
             </div>
           </div>
 
       {/* Actions rapides */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Actions rapides</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <button 
+            onClick={() => navigate('/couples')}
+            className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+          >
             <Users className="h-6 w-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Nouveau couple</span>
           </button>
-          <button className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors">
+          <button 
+            onClick={() => navigate('/eggs')}
+            className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+          >
             <FileText className="h-6 w-6 text-green-600 dark:text-green-400 mx-auto mb-2" />
             <span className="text-sm font-medium text-green-700 dark:text-green-300">Enregistrer œufs</span>
           </button>
-          <button className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors">
+          <button 
+            onClick={() => navigate('/pigeonneaux')}
+            className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+          >
             <Activity className="h-6 w-6 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
             <span className="text-sm font-medium text-purple-700 dark:text-purple-300">Nouveau pigeonneau</span>
           </button>
-          <button className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
+          <button 
+            onClick={() => navigate('/health')}
+            className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+          >
             <Heart className="h-6 w-6 text-red-600 dark:text-red-400 mx-auto mb-2" />
             <span className="text-sm font-medium text-red-700 dark:text-red-300">Enregistrement santé</span>
+          </button>
+          <button 
+            onClick={() => navigate('/statistics')}
+            className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors"
+          >
+            <DollarSign className="h-6 w-6 text-yellow-600 dark:text-yellow-400 mx-auto mb-2" />
+            <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Nouvelle vente</span>
           </button>
         </div>
       </div>

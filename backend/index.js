@@ -21,6 +21,7 @@ const eggsRouter = require('./routes/eggs.js');
 const pigeonneauxRouter = require('./routes/pigeonneaux.js');
 const healthRouter = require('./routes/health.js');
 const statisticsRouter = require('./routes/statistics.js');
+const salesRouter = require('./routes/sales.js');
 
 const app = express();
 const port = config.port;
@@ -96,7 +97,8 @@ app.get('/api/test', (req, res) => {
         eggs: '/api/eggs/*',
         pigeonneaux: '/api/pigeonneaux/*',
         health: '/api/health-records/*',
-        statistics: '/api/statistics/*'
+        statistics: '/api/statistics/*',
+        sales: '/api/sales/*'
       }
     }
   });
@@ -111,6 +113,7 @@ app.use('/api/eggs', eggsRouter);
 app.use('/api/pigeonneaux', pigeonneauxRouter);
 app.use('/api/health-records', healthRouter);
 app.use('/api/statistics', statisticsRouter);
+app.use('/api/sales', salesRouter);
 
 // Gestionnaire d'erreurs 404
 app.use(notFoundHandler);
@@ -146,6 +149,7 @@ const server = app.listen(port, async () => {
   console.log(`   - /api/pigeonneaux/* (gestion des pigeonneaux)`);
   console.log(`   - /api/health-records/* (suivi de la santé)`);
   console.log(`   - /api/statistics/* (statistiques)`);
+  console.log(`   - /api/sales/* (gestion des ventes)`);
   console.log('');
   console.log('💡 Utilisez npm run dev pour le développement avec rechargement automatique');
   console.log('💡 Testez l\'API: http://localhost:3002/api/health');

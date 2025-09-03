@@ -179,53 +179,7 @@ const CouplesManagement: React.FC = () => {
             </button>
         </div>
 
-      {/* Filtres */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Search className="h-4 w-4 inline mr-1" />
-              Recherche
-            </label>
-              <input
-                type="text"
-              placeholder="Rechercher un couple..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Filter className="h-4 w-4 inline mr-1" />
-              Statut
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="active">Actif</option>
-              <option value="reproduction">En reproduction</option>
-              <option value="inactive">Inactif</option>
-            </select>
-          </div>
-          
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('all');
-              }}
-              className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors"
-            >
-              Réinitialiser
-            </button>
-          </div>
-        </div>
-          </div>
+
 
       {/* Tableau */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
@@ -333,7 +287,7 @@ const CouplesManagement: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Nom du couple *
+                    ID/numéro de cage *
                     </label>
                     <input
                       type="text"
@@ -341,7 +295,7 @@ const CouplesManagement: React.FC = () => {
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="Ex: Couple Alpha"
+                    placeholder="Ex: CO0, A82"
                     />
                   </div>
                   
@@ -363,7 +317,7 @@ const CouplesManagement: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Nom du mâle *
+                    ID mâle *
                     </label>
                     <input
                     type="text"
@@ -371,13 +325,13 @@ const CouplesManagement: React.FC = () => {
                     value={formData.male}
                     onChange={(e) => setFormData({...formData, male: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="Ex: Romeo"
+                    placeholder="Ex: M002"
                     />
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Nom de la femelle *
+                    ID femelle *
                     </label>
                     <input
                       type="text"
@@ -385,7 +339,7 @@ const CouplesManagement: React.FC = () => {
                     value={formData.female}
                     onChange={(e) => setFormData({...formData, female: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="Ex: Juliette"
+                    placeholder="Ex: F003"
                   />
                 </div>
                   </div>

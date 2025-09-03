@@ -42,7 +42,6 @@ const EggTracking: React.FC = () => {
 
   const [formData, setFormData] = useState({
     coupleId: '',
-    coupleName: '',
     egg1Date: new Date().toISOString().split('T')[0],
     egg2Date: '',
     hatchDate1: '',
@@ -58,8 +57,8 @@ const EggTracking: React.FC = () => {
     
     try {
       // Validation côté frontend
-      if (!formData.coupleId || isNaN(parseInt(formData.coupleId))) {
-        alert('Veuillez entrer un ID de couple valide');
+      if (!formData.coupleId || formData.coupleId.trim() === '') {
+        alert('Veuillez entrer un ID/numéro de cage valide');
         return;
       }
       
@@ -70,7 +69,7 @@ const EggTracking: React.FC = () => {
 
       // Transformer les données pour le backend
       const backendData = {
-        coupleId: parseInt(formData.coupleId),
+        coupleId: formData.coupleId.trim(),
         egg1Date: formData.egg1Date,
         egg2Date: formData.egg2Date || null,
         hatchDate1: formData.hatchDate1 || null,
@@ -127,7 +126,6 @@ const EggTracking: React.FC = () => {
     
     setFormData({
       coupleId: egg.coupleId.toString(),
-      coupleName: egg.coupleName || '',
       egg1Date: formatDateForInput(egg.egg1Date),
       egg2Date: formatDateForInput(egg.egg2Date || ''),
       hatchDate1: formatDateForInput(egg.hatchDate1 || ''),
@@ -157,7 +155,6 @@ const EggTracking: React.FC = () => {
   const resetForm = () => {
     setFormData({
       coupleId: '',
-      coupleName: '',
       egg1Date: new Date().toISOString().split('T')[0],
       egg2Date: '',
       hatchDate1: '',
@@ -216,53 +213,7 @@ const EggTracking: React.FC = () => {
             </button>
         </div>
 
-      {/* Filtres */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Search className="h-4 w-4 inline mr-1" />
-              Recherche
-            </label>
-              <input
-                type="text"
-              placeholder="Rechercher un couple..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Filter className="h-4 w-4 inline mr-1" />
-              Statut
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="incubation">En incubation</option>
-              <option value="hatched">Éclos</option>
-              <option value="failed">Échoué</option>
-            </select>
-          </div>
-          
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('all');
-              }}
-              className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors"
-            >
-              Réinitialiser
-            </button>
-          </div>
-        </div>
-          </div>
+
 
       {/* Tableau */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
@@ -383,29 +334,15 @@ const EggTracking: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    ID du couple *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.coupleId}
-                    onChange={(e) => setFormData({...formData, coupleId: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="Ex: 1"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Nom du couple *
+                    ID/numéro de cage *
                   </label>
                   <input
                     type="text"
                     required
-                    value={formData.coupleName}
-                    onChange={(e) => setFormData({...formData, coupleName: e.target.value})}
+                    value={formData.coupleId}
+                    onChange={(e) => setFormData({...formData, coupleId: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="Ex: Couple Alpha"
+                    placeholder="Ex: CO0, A82"
                   />
                 </div>
                 </div>

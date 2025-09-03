@@ -40,7 +40,6 @@ const PigeonnalManagement: React.FC = () => {
 
   const [formData, setFormData] = useState({
     coupleId: '',
-    coupleName: '',
     birthDate: new Date().toISOString().split('T')[0],
     sex: 'unknown' as const,
     weight: '',
@@ -54,8 +53,8 @@ const PigeonnalManagement: React.FC = () => {
     
     try {
       // Validation côté frontend
-      if (!formData.coupleId || isNaN(parseInt(formData.coupleId))) {
-        alert('Veuillez entrer un ID de couple valide');
+      if (!formData.coupleId || formData.coupleId.trim() === '') {
+        alert('Veuillez entrer un ID/numéro de cage valide');
         return;
       }
 
@@ -64,18 +63,19 @@ const PigeonnalManagement: React.FC = () => {
         return;
       }
 
-      if (!formData.weight || isNaN(parseFloat(formData.weight))) {
+      // Le poids est optionnel, mais s'il est fourni, il doit être valide
+      if (formData.weight && isNaN(parseFloat(formData.weight))) {
         alert('Veuillez entrer un poids valide');
         return;
       }
 
       // Transformer les données pour le backend
       const backendData = {
-        coupleId: parseInt(formData.coupleId),
+        coupleId: formData.coupleId.trim(),
         eggRecordId: null, // Pour l'instant, on peut laisser null
         birthDate: formData.birthDate,
         sex: formData.sex,
-        weight: parseFloat(formData.weight),
+        weight: formData.weight ? parseFloat(formData.weight) : null,
         weaningDate: null, // Optionnel
         status: formData.status,
         salePrice: formData.salePrice ? parseFloat(formData.salePrice) : null,
@@ -117,7 +117,6 @@ const PigeonnalManagement: React.FC = () => {
     setEditingPigeonneau(pigeonneau);
     setFormData({
       coupleId: pigeonneau.coupleId.toString(),
-      coupleName: pigeonneau.coupleName || '',
       birthDate: pigeonneau.birthDate,
       sex: pigeonneau.sex,
       weight: pigeonneau.weight.toString(),
@@ -145,7 +144,6 @@ const PigeonnalManagement: React.FC = () => {
   const resetForm = () => {
     setFormData({
       coupleId: '',
-      coupleName: '',
       birthDate: new Date().toISOString().split('T')[0],
       sex: 'unknown',
       weight: '',
@@ -190,52 +188,7 @@ const PigeonnalManagement: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Search className="h-4 w-4 inline mr-1" />
-              Recherche
-            </label>
-          <input
-            type="text"
-              placeholder="Rechercher un couple..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-        
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Filter className="h-4 w-4 inline mr-1" />
-              Statut
-            </label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
-          >
-            <option value="all">Tous les statuts</option>
-              <option value="active">Actif</option>
-              <option value="sold">Vendu</option>
-              <option value="deceased">Décédé</option>
-          </select>
-        </div>
-        
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('all');
-              }}
-              className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors"
-            >
-              Réinitialiser
-            </button>
-          </div>
-        </div>
-      </div>
+
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="overflow-x-auto">
@@ -315,24 +268,14 @@ const PigeonnalManagement: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ID du couple *</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ID/numéro de cage *</label>
                   <input
-                    type="number"
+                    type="text"
                     required
                     value={formData.coupleId}
                     onChange={(e) => setFormData({...formData, coupleId: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nom du couple *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.coupleName || ''}
-                    onChange={(e) => setFormData({...formData, coupleName: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Ex: CO0, A82"
                   />
                 </div>
               </div>
@@ -364,13 +307,13 @@ const PigeonnalManagement: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Poids (g) *</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Poids (g)</label>
                   <input
                     type="number"
-                    required
                     value={formData.weight}
                     onChange={(e) => setFormData({...formData, weight: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Optionnel"
                   />
                 </div>
               </div>
