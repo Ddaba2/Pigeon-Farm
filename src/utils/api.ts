@@ -272,6 +272,19 @@ class ApiService {
   async getCSRFToken() {
     return this.get('/auth/csrf-token');
   }
+
+  // Méthodes de récupération de mot de passe
+  async forgotPassword(email: string) {
+    return this.post('/forgot-password', { email });
+  }
+
+  async verifyResetCode(email: string, code: string) {
+    return this.post('/verify-reset-code', { email, code });
+  }
+
+  async resetPassword(data: { email: string; code: string; newPassword: string }) {
+    return this.post('/reset-password', data);
+  }
 }
 
 // Instance unique du service API

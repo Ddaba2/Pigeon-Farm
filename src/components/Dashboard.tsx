@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Users, FileText, Activity, Heart, TrendingUp, Calendar, Clock, DollarSign } from 'lucide-react';
 import apiService from '../utils/api';
-import { useNavigate } from 'react-router-dom';
 
 interface DashboardStats {
   totalCouples: number;
@@ -19,8 +18,11 @@ interface DashboardStats {
   }>;
 }
 
-const Dashboard: React.FC = () => {
-  const navigate = useNavigate();
+interface DashboardProps {
+  onNavigate?: (tab: string) => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [stats, setStats] = useState<DashboardStats>({
     totalCouples: 0,
     totalEggs: 0,
@@ -178,35 +180,35 @@ const Dashboard: React.FC = () => {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Actions rapides</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <button 
-            onClick={() => navigate('/couples')}
+            onClick={() => onNavigate?.('couples')}
             className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
           >
             <Users className="h-6 w-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Nouveau couple</span>
           </button>
           <button 
-            onClick={() => navigate('/eggs')}
+            onClick={() => onNavigate?.('eggs')}
             className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
           >
             <FileText className="h-6 w-6 text-green-600 dark:text-green-400 mx-auto mb-2" />
             <span className="text-sm font-medium text-green-700 dark:text-green-300">Enregistrer œufs</span>
           </button>
           <button 
-            onClick={() => navigate('/pigeonneaux')}
+            onClick={() => onNavigate?.('pigeonneaux')}
             className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
           >
             <Activity className="h-6 w-6 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
             <span className="text-sm font-medium text-purple-700 dark:text-purple-300">Nouveau pigeonneau</span>
           </button>
           <button 
-            onClick={() => navigate('/health')}
+            onClick={() => onNavigate?.('health')}
             className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
           >
             <Heart className="h-6 w-6 text-red-600 dark:text-red-400 mx-auto mb-2" />
             <span className="text-sm font-medium text-red-700 dark:text-red-300">Enregistrement santé</span>
           </button>
           <button 
-            onClick={() => navigate('/statistics')}
+            onClick={() => onNavigate?.('statistics')}
             className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors"
           >
             <DollarSign className="h-6 w-6 text-yellow-600 dark:text-yellow-400 mx-auto mb-2" />

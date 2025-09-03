@@ -51,7 +51,7 @@ async function sendPasswordResetEmail(to, code) {
 
         // MODE PRODUCTION : Envoyer l'email réel
         const mailOptions = {
-            from: process.env.EMAIL_USER,
+            from: '"PigeonFarm" <' + process.env.EMAIL_USER + '>',
             to: to,
             subject: '🔐 Réinitialisation de votre mot de passe - PigeonFarm',
             html: `
@@ -131,7 +131,7 @@ async function sendPasswordResetConfirmation(to) {
 
         // MODE PRODUCTION : Envoyer l'email réel
         const mailOptions = {
-            from: process.env.EMAIL_USER,
+            from: '"PigeonFarm" <' + process.env.EMAIL_USER + '>',
             to: to,
             subject: '✅ Mot de passe réinitialisé avec succès - PigeonFarm',
             html: `

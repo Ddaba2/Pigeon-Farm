@@ -173,9 +173,9 @@ router.post('/reset-password', async (req, res) => {
 
         console.log('🔑 Réinitialisation du mot de passe pour l\'email:', email);
 
-        // 1. Vérifier que le code est valide et non utilisé
+        // 1. Vérifier que le code est valide et a été vérifié (used = TRUE)
         const codes = await executeQuery(
-            'SELECT * FROM password_reset_codes WHERE email = ? AND code = ? AND expires_at > NOW() AND used = TRUE',
+            'SELECT * FROM password_reset_codes WHERE email = ? AND code = ? AND used = TRUE',
             [email, code]
         );
 

@@ -87,7 +87,7 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard onNavigate={setActiveTab} />;
       case 'couples':
         return <CouplesManagement />;
       case 'eggs':
