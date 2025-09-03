@@ -418,7 +418,6 @@ const Statistics: React.FC = () => {
                          sale.targetType === 'oeuf' ? 'Œuf' :
                          sale.targetType === 'male' ? 'Mâle' : 'Femelle'}
                       </span>
-                      {sale.targetName || sale.targetId}
                     </div>
                   </td>
                                      <td className="px-6 py-4 whitespace-nowrap">
