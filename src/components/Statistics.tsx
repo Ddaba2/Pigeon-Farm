@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, BarChart3, PieChart, Calendar, Plus, Edit, Trash2, DollarSign } from 'lucide-react';
+import { TrendingUp, BarChart3, PieChart, Calendar, Plus, Edit, Trash2, DollarSign, Download } from 'lucide-react';
 import apiService from '../utils/api';
+import pdfExporter from '../utils/pdfExport';
 
 interface Sale {
   id: number;
@@ -247,11 +248,24 @@ const Statistics: React.FC = () => {
      });
    };
 
+  const handleExportPDF = async () => {
+    await pdfExporter.exportStatistics(stats, sales);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex justify-between items-center">
+          <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Statistiques</h1>
         <p className="text-gray-600 dark:text-gray-400">Vue d'ensemble de votre élevage</p>
+        </div>
+        <button
+          onClick={handleExportPDF}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+        >
+          <Download className="h-5 w-5" />
+          Exporter PDF
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -323,17 +337,17 @@ const Statistics: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">Actifs</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">{stats.couples.active}</span>
-            </div>
+                  </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">En reproduction</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">{stats.couples.reproduction}</span>
-            </div>
+                </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">Inactifs</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">{stats.couples.inactive}</span>
-            </div>
           </div>
         </div>
+      </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Statut des Œufs</h3>

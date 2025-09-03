@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Plus, Search, Filter, Edit, Trash2 } from 'lucide-react';
+import { Heart, Plus, Search, Filter, Edit, Trash2, Download } from 'lucide-react';
 import apiService from '../utils/api';
+import pdfExporter from '../utils/pdfExport';
 
 interface HealthRecord {
   id: number;
@@ -176,6 +177,10 @@ const HealthTracking: React.FC = () => {
     }
   };
 
+  const handleExportPDF = async () => {
+    await pdfExporter.exportHealthRecords(records);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -183,17 +188,26 @@ const HealthTracking: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Suivi de la Santé</h1>
           <p className="text-gray-600 dark:text-gray-400">Gérez les soins de vos pigeons</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingRecord(null);
-            resetForm();
-            setShowModal(true);
-          }}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-        >
-          <Plus className="h-5 w-5" />
-          Nouvel enregistrement
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportPDF}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Download className="h-5 w-5" />
+            Exporter PDF
+          </button>
+          <button
+            onClick={() => {
+              setEditingRecord(null);
+              resetForm();
+              setShowModal(true);
+            }}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Plus className="h-5 w-5" />
+            Nouvel enregistrement
+          </button>
+        </div>
       </div>
 
 
