@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, Search, Filter, Edit, Trash2, Eye } from 'lucide-react';
 import apiService from '../utils/api';
+import ConfirmationModal from './ConfirmationModal';
 
 interface Couple {
   id: number;
@@ -36,6 +37,10 @@ const CouplesManagement: React.FC = () => {
   const [editingCouple, setEditingCouple] = useState<Couple | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [confirmationModal, setConfirmationModal] = useState<{ isOpen: boolean; coupleId: number | null }>({
+    isOpen: false,
+    coupleId: null
+  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -112,17 +117,22 @@ const CouplesManagement: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce couple ?')) {
-    try {
-      const response = await apiService.deleteCouple(id);
-      if (response.success) {
-          setCouples(couples.filter(c => c.id !== id));
-      }
-    } catch (error) {
-      console.error('Erreur lors de la suppression:', error);
+    setConfirmationModal({ isOpen: true, coupleId: id });
+  };
+
+  const confirmDelete = async () => {
+    if (confirmationModal.coupleId) {
+      try {
+        const response = await apiService.deleteCouple(confirmationModal.coupleId);
+        if (response.success) {
+          setCouples(couples.filter(c => c.id !== confirmationModal.coupleId));
+        }
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
         alert('Erreur lors de la suppression du couple');
       }
     }
+    setConfirmationModal({ isOpen: false, coupleId: null });
   };
 
   const resetForm = () => {
@@ -411,6 +421,18 @@ const CouplesManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de confirmation */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={() => setConfirmationModal({ isOpen: false, coupleId: null })}
+        onConfirm={confirmDelete}
+        title="Confirmer la suppression"
+        message="Êtes-vous sûr de vouloir supprimer ce couple ? Cette action est irréversible."
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        type="danger"
+      />
     </div>
   );
 };

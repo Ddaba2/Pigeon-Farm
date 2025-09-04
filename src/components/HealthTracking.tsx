@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Plus, Search, Filter, Edit, Trash2, Download } from 'lucide-react';
+import { Heart, Plus, Search, Filter, Edit, Trash2, Download, X } from 'lucide-react';
 import apiService from '../utils/api';
 import pdfExporter from '../utils/pdfExport';
+import ConfirmationModal from './ConfirmationModal';
 
 interface HealthRecord {
   id: number;
@@ -16,6 +17,11 @@ interface HealthRecord {
 
 const HealthTracking: React.FC = () => {
   const [records, setRecords] = useState<HealthRecord[]>([]);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [confirmationModal, setConfirmationModal] = useState<{ isOpen: boolean; recordId: number | null }>({
+    isOpen: false,
+    recordId: null
+  });
 
   // Charger les vraies données depuis l'API
   useEffect(() => {
@@ -27,6 +33,7 @@ const HealthTracking: React.FC = () => {
         }
       } catch (error) {
         console.error('Erreur lors du chargement des enregistrements de santé:', error);
+        showNotification('error', 'Erreur lors du chargement des données');
       }
     };
 
@@ -47,29 +54,34 @@ const HealthTracking: React.FC = () => {
     observations: ''
   });
 
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       // Validation côté frontend
       if (!formData.targetId || formData.targetId.trim() === '') {
-        alert('Veuillez entrer un ID de cible valide');
+        showNotification('error', 'Veuillez entrer un ID de cible valide');
         return;
       }
 
       // Validation spécifique selon le type de cible
       if (formData.targetType === 'pigeonneau' && isNaN(parseInt(formData.targetId))) {
-        alert('Veuillez entrer un ID de pigeonneau valide (numérique)');
+        showNotification('error', 'Veuillez entrer un ID de pigeonneau valide (numérique)');
         return;
       }
 
       if (!formData.product) {
-        alert('Veuillez entrer un produit');
+        showNotification('error', 'Veuillez entrer un produit');
         return;
       }
 
       if (!formData.date) {
-        alert('Veuillez entrer une date');
+        showNotification('error', 'Veuillez entrer une date');
         return;
       }
 
@@ -83,8 +95,6 @@ const HealthTracking: React.FC = () => {
         observations: formData.observations
       };
 
-      console.log('🔍 Frontend - Données envoyées:', JSON.stringify(backendData, null, 2));
-
       if (editingRecord) {
         // Modification
         const response = await apiService.updateHealthRecord(editingRecord.id, backendData);
@@ -94,12 +104,14 @@ const HealthTracking: React.FC = () => {
               ? response.data
               : r
           ));
+          showNotification('success', 'Enregistrement modifié avec succès');
         }
       } else {
         // Ajout
         const response = await apiService.createHealthRecord(backendData);
         if (response.success) {
           setRecords([...records, response.data]);
+          showNotification('success', 'Enregistrement créé avec succès');
         }
       }
       
@@ -108,7 +120,7 @@ const HealthTracking: React.FC = () => {
       resetForm();
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      alert('Erreur lors de la sauvegarde de l\'enregistrement de santé');
+      showNotification('error', 'Erreur lors de la sauvegarde de l\'enregistrement de santé');
     }
   };
 
@@ -126,17 +138,23 @@ const HealthTracking: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet enregistrement ?')) {
+    setConfirmationModal({ isOpen: true, recordId: id });
+  };
+
+  const confirmDelete = async () => {
+    if (confirmationModal.recordId) {
       try {
-        const response = await apiService.deleteHealthRecord(id);
+        const response = await apiService.deleteHealthRecord(confirmationModal.recordId);
         if (response.success) {
-          setRecords(records.filter(r => r.id !== id));
+          setRecords(records.filter(r => r.id !== confirmationModal.recordId));
+          showNotification('success', 'Enregistrement supprimé avec succès');
         }
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
-        alert('Erreur lors de la suppression de l\'enregistrement de santé');
+        showNotification('error', 'Erreur lors de la suppression de l\'enregistrement de santé');
       }
     }
+    setConfirmationModal({ isOpen: false, recordId: null });
   };
 
   const formatDateForInput = (dateString: string) => {
@@ -178,11 +196,37 @@ const HealthTracking: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    await pdfExporter.exportHealthRecords(records);
+    try {
+      await pdfExporter.exportHealthRecords(records);
+      showNotification('success', 'Export PDF réussi');
+    } catch (error) {
+      showNotification('error', 'Erreur lors de l\'export PDF');
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 ${
+          notification.type === 'success' 
+            ? 'bg-green-500 text-white' 
+            : notification.type === 'error'
+            ? 'bg-red-500 text-white'
+            : 'bg-blue-500 text-white'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span>{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-4 text-white hover:text-gray-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Suivi de la Santé</h1>
@@ -209,8 +253,6 @@ const HealthTracking: React.FC = () => {
           </button>
         </div>
       </div>
-
-
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="overflow-x-auto">
@@ -389,6 +431,18 @@ const HealthTracking: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de confirmation */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={() => setConfirmationModal({ isOpen: false, recordId: null })}
+        onConfirm={confirmDelete}
+        title="Confirmer la suppression"
+        message="Êtes-vous sûr de vouloir supprimer cet enregistrement de santé ? Cette action est irréversible."
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        type="danger"
+      />
     </div>
   );
 };

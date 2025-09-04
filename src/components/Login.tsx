@@ -97,7 +97,13 @@ function Login({ onAuthSuccess }: LoginProps) {
       setSuccess('Code à 4 chiffres envoyé à votre email');
       goToForgotPasswordStep('code');
     } catch (err: any) {
-      setError(err.message || 'Erreur lors de l\'envoi du code');
+      if (err.message?.includes('not found') || err.message?.includes('404')) {
+        setError('Aucun compte trouvé avec cette adresse email');
+      } else if (err.message?.includes('network') || err.message?.includes('connection')) {
+        setError('Erreur de connexion au serveur. Vérifiez votre connexion internet');
+      } else {
+        setError(err.message || 'Erreur lors de l\'envoi du code');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -117,7 +123,15 @@ function Login({ onAuthSuccess }: LoginProps) {
       setSuccess('Code vérifié avec succès ! Créez votre nouveau mot de passe');
       goToForgotPasswordStep('new-password');
     } catch (err: any) {
-      setError(err.message || 'Code invalide. Vérifiez votre email et réessayez');
+      if (err.message?.includes('invalid') || err.message?.includes('wrong')) {
+        setError('Code incorrect. Vérifiez votre email et réessayez');
+      } else if (err.message?.includes('expired')) {
+        setError('Code expiré. Demandez un nouveau code');
+      } else if (err.message?.includes('network') || err.message?.includes('connection')) {
+        setError('Erreur de connexion au serveur. Vérifiez votre connexion internet');
+      } else {
+        setError(err.message || 'Code invalide. Vérifiez votre email et réessayez');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -151,7 +165,15 @@ function Login({ onAuthSuccess }: LoginProps) {
       setSuccess('Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter');
       closeForgotPasswordModal();
     } catch (err: any) {
-      setError(err.message || 'Erreur lors de la réinitialisation. Vérifiez votre code et réessayez');
+      if (err.message?.includes('invalid') || err.message?.includes('wrong')) {
+        setError('Code incorrect ou expiré. Demandez un nouveau code');
+      } else if (err.message?.includes('password') || err.message?.includes('weak')) {
+        setError('Le mot de passe doit contenir au moins 6 caractères');
+      } else if (err.message?.includes('network') || err.message?.includes('connection')) {
+        setError('Erreur de connexion au serveur. Vérifiez votre connexion internet');
+      } else {
+        setError(err.message || 'Erreur lors de la réinitialisation. Vérifiez votre code et réessayez');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -212,7 +234,37 @@ function Login({ onAuthSuccess }: LoginProps) {
       }
     } catch (err: any) {
       console.error('Erreur d\'authentification:', err);
-      setError(err.message || 'Erreur lors de l\'authentification');
+      
+      // Messages d'erreur spécifiques selon le type d'erreur
+      if (isLogin) {
+        // Erreurs de connexion
+        if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+          setError('Nom d\'utilisateur ou mot de passe incorrect');
+        } else if (err.message?.includes('404') || err.message?.includes('Not Found')) {
+          setError('Nom d\'utilisateur ou mot de passe incorrect');
+        } else if (err.message?.includes('400') || err.message?.includes('Bad Request')) {
+          setError('Nom d\'utilisateur ou mot de passe incorrect');
+        } else if (err.message?.includes('credentials') || err.message?.includes('invalid')) {
+          setError('Nom d\'utilisateur ou mot de passe incorrect');
+        } else if (err.message?.includes('network') || err.message?.includes('connection')) {
+          setError('Erreur de connexion au serveur. Vérifiez votre connexion internet');
+        } else {
+          setError('Nom d\'utilisateur ou mot de passe incorrect');
+        }
+      } else {
+        // Erreurs d'inscription
+        if (err.message?.includes('username') || err.message?.includes('already exists')) {
+          setError('Ce nom d\'utilisateur est déjà utilisé');
+        } else if (err.message?.includes('email') || err.message?.includes('already exists')) {
+          setError('Cette adresse email est déjà utilisée');
+        } else if (err.message?.includes('password') || err.message?.includes('weak')) {
+          setError('Le mot de passe doit contenir au moins 6 caractères');
+        } else if (err.message?.includes('network') || err.message?.includes('connection')) {
+          setError('Erreur de connexion au serveur. Vérifiez votre connexion internet');
+        } else {
+          setError('Erreur lors de l\'inscription. Vérifiez vos informations');
+        }
+      }
     } finally {
       setIsLoading(false);
     }

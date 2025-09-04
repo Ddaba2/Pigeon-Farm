@@ -166,8 +166,7 @@ const EdgeDiagnostic: React.FC<EdgeDiagnosticProps> = ({
             <button
               onClick={() => {
                 const info = edgeSafeStorage.getDiagnosticInfo();
-                console.log('🌐 Diagnostic Edge complet:', info);
-                alert('Informations affichées dans la console');
+                alert(`Diagnostic Edge:\n${JSON.stringify(info, null, 2)}`);
               }}
               className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
             >

@@ -19,7 +19,6 @@ const diagnostic = runEdgeDiagnostic();
 
 // Initialiser la compatibilité Edge si nécessaire
 if (diagnostic.issues.length > 0) {
-  console.log('🔧 Initialisation de la compatibilité Edge...');
   initializeEdgeCompatibility();
 }
 

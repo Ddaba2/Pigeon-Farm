@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Plus, Search, Filter, Edit, Trash2 } from 'lucide-react';
+import { Activity, Plus, Search, Filter, Edit, Trash2, X } from 'lucide-react';
 import apiService from '../utils/api';
+import ConfirmationModal from './ConfirmationModal';
 
 interface Pigeonneau {
   id: number;
@@ -16,6 +17,11 @@ interface Pigeonneau {
 
 const PigeonnalManagement: React.FC = () => {
   const [pigeonneaux, setPigeonneaux] = useState<Pigeonneau[]>([]);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [confirmationModal, setConfirmationModal] = useState<{ isOpen: boolean; pigeonneauId: number | null }>({
+    isOpen: false,
+    pigeonneauId: null
+  });
 
   // Charger les vraies données depuis l'API
   useEffect(() => {
@@ -27,6 +33,7 @@ const PigeonnalManagement: React.FC = () => {
         }
       } catch (error) {
         console.error('Erreur lors du chargement des pigeonneaux:', error);
+        showNotification('error', 'Erreur lors du chargement des données');
       }
     };
 
@@ -48,24 +55,29 @@ const PigeonnalManagement: React.FC = () => {
     observations: ''
   });
 
-    const handleSubmit = async (e: React.FormEvent) => {
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       // Validation côté frontend
       if (!formData.coupleId || formData.coupleId.trim() === '') {
-        alert('Veuillez entrer un ID/numéro de cage valide');
+        showNotification('error', 'Veuillez entrer un ID/numéro de cage valide');
         return;
       }
 
       if (!formData.birthDate) {
-        alert('Veuillez entrer une date de naissance');
+        showNotification('error', 'Veuillez entrer une date de naissance');
         return;
       }
 
       // Le poids est optionnel, mais s'il est fourni, il doit être valide
       if (formData.weight && isNaN(parseFloat(formData.weight))) {
-        alert('Veuillez entrer un poids valide');
+        showNotification('error', 'Veuillez entrer un poids valide');
         return;
       }
 
@@ -84,8 +96,6 @@ const PigeonnalManagement: React.FC = () => {
         observations: formData.observations
       };
 
-      console.log('🔍 Frontend - Données envoyées:', JSON.stringify(backendData, null, 2));
-
       if (editingPigeonneau) {
         // Modification
         const response = await apiService.updatePigeonneau(editingPigeonneau.id, backendData);
@@ -95,12 +105,14 @@ const PigeonnalManagement: React.FC = () => {
               ? response.data
               : p
           ));
+          showNotification('success', 'Pigeonneau modifié avec succès');
         }
       } else {
         // Ajout
         const response = await apiService.createPigeonneau(backendData);
         if (response.success) {
           setPigeonneaux([...pigeonneaux, response.data]);
+          showNotification('success', 'Pigeonneau créé avec succès');
         }
       }
       
@@ -109,7 +121,7 @@ const PigeonnalManagement: React.FC = () => {
       resetForm();
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      alert('Erreur lors de la sauvegarde du pigeonneau');
+      showNotification('error', 'Erreur lors de la sauvegarde du pigeonneau');
     }
   };
 
@@ -128,17 +140,23 @@ const PigeonnalManagement: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce pigeonneau ?')) {
+    setConfirmationModal({ isOpen: true, pigeonneauId: id });
+  };
+
+  const confirmDelete = async () => {
+    if (confirmationModal.pigeonneauId) {
       try {
-        const response = await apiService.deletePigeonneau(id);
+        const response = await apiService.deletePigeonneau(confirmationModal.pigeonneauId);
         if (response.success) {
-          setPigeonneaux(pigeonneaux.filter(p => p.id !== id));
+          setPigeonneaux(pigeonneaux.filter(p => p.id !== confirmationModal.pigeonneauId));
+          showNotification('success', 'Pigeonneau supprimé avec succès');
         }
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
-        alert('Erreur lors de la suppression du pigeonneau');
+        showNotification('error', 'Erreur lors de la suppression du pigeonneau');
       }
     }
+    setConfirmationModal({ isOpen: false, pigeonneauId: null });
   };
 
   const resetForm = () => {
@@ -170,6 +188,27 @@ const PigeonnalManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 ${
+          notification.type === 'success' 
+            ? 'bg-green-500 text-white' 
+            : notification.type === 'error'
+            ? 'bg-red-500 text-white'
+            : 'bg-blue-500 text-white'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span>{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-4 text-white hover:text-gray-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Gestion des Pigeonneaux</h1>
@@ -187,8 +226,6 @@ const PigeonnalManagement: React.FC = () => {
           Nouveau pigeonneau
         </button>
       </div>
-
-
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="overflow-x-auto">
@@ -377,6 +414,18 @@ const PigeonnalManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de confirmation */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={() => setConfirmationModal({ isOpen: false, pigeonneauId: null })}
+        onConfirm={confirmDelete}
+        title="Confirmer la suppression"
+        message="Êtes-vous sûr de vouloir supprimer ce pigeonneau ? Cette action est irréversible."
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        type="danger"
+      />
     </div>
   );
 };

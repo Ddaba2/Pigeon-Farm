@@ -5,8 +5,6 @@ export const runEdgeDiagnostic = () => {
   const issues: string[] = [];
   const solutions: string[] = [];
   
-  console.log('🔍 Diagnostic Edge en cours...');
-  
   // Vérifier la version d'Edge
   const userAgent = navigator.userAgent;
   const isEdge = userAgent.includes('Edg');
@@ -22,7 +20,6 @@ export const runEdgeDiagnostic = () => {
     const testKey = '__diagnostic_test__';
     window.localStorage.setItem(testKey, 'test');
     window.localStorage.removeItem(testKey);
-    console.log('✅ localStorage fonctionne correctement');
   } catch {
     issues.push('localStorage bloqué par Edge');
     solutions.push('Utilisation du stockage en mémoire activée');
@@ -48,7 +45,6 @@ export const runEdgeDiagnostic = () => {
   // Vérifier les modules ES6
   try {
     eval('import("").catch(()=>{})');
-    console.log('✅ Modules ES6 supportés');
   } catch {
     issues.push('Modules ES6 non supportés');
     solutions.push('Configuration Vite adaptée');
@@ -57,9 +53,7 @@ export const runEdgeDiagnostic = () => {
   // Afficher le rapport
   if (issues.length > 0) {
     console.warn('⚠️ Problèmes détectés:', issues);
-    console.log('💡 Solutions appliquées:', solutions);
-  } else {
-    console.log('✅ Aucun problème détecté');
+    console.warn('💡 Solutions appliquées:', solutions);
   }
   
   return { issues, solutions, isEdge, isEdgeLegacy };
@@ -138,8 +132,6 @@ export const createEdgeSafeStorage = () => {
 
     if (!test.available) {
       console.warn('🚫 localStorage non disponible dans Edge:', test.error);
-    } else {
-      console.log('✅ localStorage fonctionnel dans Edge');
     }
 
     return localStorageAvailable;
@@ -232,14 +224,9 @@ export const edgeSafeStorage = createEdgeSafeStorage();
 
 // Fonction d'initialisation pour Edge
 export const initializeEdgeCompatibility = (): void => {
-  console.log('🌐 Initialisation de la compatibilité Edge...');
-  
   const diagnostic = edgeSafeStorage.getDiagnosticInfo();
-  console.log('📊 Diagnostic Edge:', diagnostic);
 
   if (diagnostic.isEdge) {
-    console.log('🔧 Mode Edge détecté, optimisation appliquée');
-    
     // Ajouter des classes CSS spécifiques à Edge
     document.documentElement.classList.add('edge-browser');
     
@@ -250,7 +237,6 @@ export const initializeEdgeCompatibility = (): void => {
     
     if (diagnostic.isEdgeChromium) {
       document.documentElement.classList.add('edge-chromium');
-      console.log('✅ Edge Chromium détecté');
     }
   }
 };
@@ -311,9 +297,6 @@ export const checkAppFunctionality = () => {
   }
   
   const allWorking = Object.values(checks).every(check => check);
-  
-  console.log('🔍 État de l\'application:', checks);
-  console.log(allWorking ? '✅ Application fonctionnelle' : '⚠️ Problèmes détectés');
   
   return { checks, allWorking };
 }; 

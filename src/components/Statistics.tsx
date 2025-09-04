@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, BarChart3, PieChart, Calendar, Plus, Edit, Trash2, DollarSign, Download } from 'lucide-react';
 import apiService from '../utils/api';
 import pdfExporter from '../utils/pdfExport';
+import ConfirmationModal from './ConfirmationModal';
 
 interface Sale {
   id: number;
@@ -52,6 +53,10 @@ const Statistics: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [confirmationModal, setConfirmationModal] = useState<{ isOpen: boolean; saleId: number | null }>({
+    isOpen: false,
+    saleId: null
+  });
   const [formData, setFormData] = useState({
     targetType: 'pigeonneau' as const,
     targetId: '',
@@ -214,17 +219,22 @@ const Statistics: React.FC = () => {
    };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette vente ?')) {
+    setConfirmationModal({ isOpen: true, saleId: id });
+  };
+
+  const confirmDelete = async () => {
+    if (confirmationModal.saleId) {
       try {
-        const response = await apiService.delete(`/sales/${id}`);
+        const response = await apiService.delete(`/sales/${confirmationModal.saleId}`);
         if (response.success) {
-          setSales(sales.filter(s => s.id !== id));
+          setSales(sales.filter(s => s.id !== confirmationModal.saleId));
         }
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
         alert('Erreur lors de la suppression de la vente');
       }
     }
+    setConfirmationModal({ isOpen: false, saleId: null });
   };
 
   const formatDateForInput = (dateString: string) => {
@@ -653,6 +663,18 @@ const Statistics: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de confirmation */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={() => setConfirmationModal({ isOpen: false, saleId: null })}
+        onConfirm={confirmDelete}
+        title="Confirmer la suppression"
+        message="Êtes-vous sûr de vouloir supprimer cette vente ? Cette action est irréversible."
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        type="danger"
+      />
     </div>
   );
 };

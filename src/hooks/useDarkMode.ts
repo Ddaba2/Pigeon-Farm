@@ -30,10 +30,8 @@ export const useDarkMode = () => {
       // Appliquer la classe dark au document
       if (isDarkMode) {
         document.documentElement.classList.add('dark');
-        console.log('🌙 Mode sombre activé');
       } else {
         document.documentElement.classList.remove('dark');
-        console.log('☀️ Mode clair activé');
       }
     } catch (error) {
       console.warn('Erreur lors de la sauvegarde du mode sombre:', error);

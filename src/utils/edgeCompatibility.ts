@@ -23,7 +23,6 @@ function testLocalStorage(): boolean {
       }
       
       if (readValue === 'test') {
-        console.log('✅ localStorage fonctionnel');
         localStorageAvailable = true;
         return true;
       } else {
@@ -185,7 +184,6 @@ export function checkEdgeCompatibility(): boolean {
   const isEdgeLegacy = userAgent.includes('Edge');
   
   if (isEdge || isEdgeLegacy) {
-    console.log('Navigateur Edge détecté');
     return true;
   }
   
