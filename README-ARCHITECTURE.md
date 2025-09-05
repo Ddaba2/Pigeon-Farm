@@ -91,7 +91,7 @@ backend/
 │   ├── statisticsService.js
 │   └── userService.js
 ├── middleware/           # Middleware Express
-│   ├── auth.js           # Authentification JWT
+│   ├── auth.js           # Authentification par session
 │   └── security.js       # Sécurité
 └── config/               # Configuration
     ├── database.js       # Configuration MySQL
@@ -143,10 +143,10 @@ router.delete('/couples/:id', authMiddleware, coupleController.delete);
 
 ## 🔐 Sécurité et Authentification
 
-### JWT (JSON Web Tokens)
-- **Login** : Vérification des identifiants
+### Authentification par Session
+- **Login** : Vérification des identifiants (nom d'utilisateur/mot de passe)
 - **Middleware** : Protection des routes sensibles
-- **Refresh** : Renouvellement automatique des tokens
+- **Sessions** : Gestion des sessions en base de données
 - **Logout** : Invalidation des sessions
 
 ### Rôles et Permissions
@@ -192,7 +192,7 @@ DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=password
 DB_NAME=pigeon_manager
-JWT_SECRET=your-secret-key
+COOKIE_SECRET=your-secret-key
 PORT=3002
 
 # Frontend

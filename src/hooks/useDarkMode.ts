@@ -1,51 +1,44 @@
 import { useState, useEffect } from 'react';
-import { safeLocalStorage } from '../utils/edgeCompatibility';
+import { edgeLocalStorage, isEdgeLocalStorageAvailable } from '../utils/storageManager';
 
 export const useDarkMode = () => {
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Utiliser une approche plus sûre pour éviter les erreurs Edge
+    // Initialisation sécurisée avec gestionnaire Edge
     try {
-      // Vérifier d'abord localStorage, puis la préférence système
-      const saved = safeLocalStorage.getItem('darkMode');
-      if (saved !== null) {
-        try {
-          return JSON.parse(saved);
-        } catch (error) {
-          console.warn('Erreur lors du parsing du mode sombre:', error);
-        }
+      if (isEdgeLocalStorageAvailable()) {
+        const saved = edgeLocalStorage.getItem('darkMode');
+        return saved ? JSON.parse(saved) : false;
       }
-      // Préférence système par défaut
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return false;
     } catch (error) {
-      console.warn('Erreur lors de l\'initialisation du mode sombre, utilisation du mode clair par défaut:', error);
-      return false; // Mode clair par défaut en cas d'erreur
+      console.warn('Erreur lors de la lecture du mode sombre:', error);
+      return false;
     }
   });
 
+  // Appliquer le mode sombre au document
   useEffect(() => {
-    try {
-      // Sauvegarder dans localStorage de manière sécurisée
-      safeLocalStorage.setItem('darkMode', JSON.stringify(isDarkMode));
-      
-      // Appliquer la classe dark au document
-      if (isDarkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    } catch (error) {
-      console.warn('Erreur lors de la sauvegarde du mode sombre:', error);
-      // Appliquer quand même le mode visuellement
-      if (isDarkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+    const htmlElement = document.documentElement;
+    if (isDarkMode) {
+      htmlElement.classList.add('dark');
+    } else {
+      htmlElement.classList.remove('dark');
     }
   }, [isDarkMode]);
 
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    
+    // Sauvegarde sécurisée avec gestionnaire Edge
+    try {
+      if (isEdgeLocalStorageAvailable()) {
+        edgeLocalStorage.setItem('darkMode', JSON.stringify(newMode));
+        console.log(`🌙 Mode sombre ${newMode ? 'activé' : 'désactivé'}`);
+      }
+    } catch (error) {
+      console.warn('Erreur lors de la sauvegarde du mode sombre:', error);
+    }
   };
 
   return { isDarkMode, toggleDarkMode };

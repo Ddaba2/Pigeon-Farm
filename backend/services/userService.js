@@ -7,15 +7,21 @@ class UserService {
     const { username, email, password, fullName, role = 'user' } = userData;
     
     try {
-      // Hacher le mot de passe
-      const hashedPassword = await bcrypt.hash(password, 12);
+      // Hacher le mot de passe seulement s'il est fourni
+      const hashedPassword = password ? await bcrypt.hash(password, 12) : null;
       
       const sql = `
         INSERT INTO users (username, email, password, full_name, role, created_at, last_login) 
         VALUES (?, ?, ?, ?, ?, NOW(), NULL)
       `;
       
-      const result = await executeQuery(sql, [username, email, hashedPassword, fullName, role]);
+      const result = await executeQuery(sql, [
+        username, 
+        email, 
+        hashedPassword, 
+        fullName || '', 
+        role
+      ]);
       
       // Récupérer l'utilisateur créé
       const newUser = await this.getUserById(result.insertId);
@@ -172,6 +178,8 @@ class UserService {
       throw error;
     }
   }
+
+
 }
 
 module.exports = UserService; 

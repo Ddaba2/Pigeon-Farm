@@ -21,11 +21,19 @@ export default defineConfig({
   },
   server: {
     host: true,
-    port: parseInt(process.env.VITE_PORT || '5174'),
-    strictPort: false,
+    port: 5174,
+    strictPort: true,
     headers: {
       'Cross-Origin-Embedder-Policy': 'unsafe-none',
       'Cross-Origin-Opener-Policy': 'unsafe-none',
+      // Headers de compatibilité Edge
+      'X-UA-Compatible': 'IE=edge',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'SAMEORIGIN',
+      'X-XSS-Protection': '1; mode=block',
     },
     proxy: {
       '/api': {

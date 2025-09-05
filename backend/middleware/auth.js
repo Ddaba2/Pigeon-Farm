@@ -8,11 +8,19 @@ const activeSessions = new Map();
 // Middleware d'authentification simple par session
 const authenticateUser = (req, res, next) => {
   try {
+    // Debug de l'authentification
+    console.log('🔐 Auth check for:', req.method, req.path);
+    console.log('🍪 Cookies:', req.cookies);
+    console.log('📋 Headers:', req.headers['x-session-id'] ? 'x-session-id présent' : 'x-session-id manquant');
+    
     // Vérifier l'authentification par session
     // Priorité : cookies, puis en-tête x-session-id
     const sessionId = req.cookies?.sessionId || req.headers['x-session-id'];
     
+    console.log('🎫 SessionId reçu:', sessionId ? 'Présent' : 'Manquant');
+    
     if (!sessionId) {
+      console.log('❌ Aucun sessionId fourni');
       return res.status(401).json({ 
         error: 'Authentification requise - Aucun sessionId fourni',
         code: 'AUTH_REQUIRED'
@@ -20,6 +28,8 @@ const authenticateUser = (req, res, next) => {
     }
     
     if (!activeSessions.has(sessionId)) {
+      console.log('❌ Session invalide:', sessionId);
+      console.log('📊 Sessions actives:', Array.from(activeSessions.keys()));
       return res.status(401).json({ 
         error: 'Session invalide',
         code: 'INVALID_SESSION'
@@ -39,6 +49,7 @@ const authenticateUser = (req, res, next) => {
     
     // Ajouter l'utilisateur à la requête
     req.user = session.user;
+    console.log('✅ Authentification réussie pour:', session.user.username);
     next();
   } catch (error) {
     console.error('❌ Erreur d\'authentification:', error);

@@ -135,7 +135,7 @@ const server = app.listen(port, async () => {
   console.log(`📊 Mode: ${config.nodeEnv}`);
   console.log(`🌐 URL: http://localhost:${port}`);
   console.log(`🔒 Sécurité: Helmet, Rate Limiting, CORS configurés`);
-  console.log(`🔐 Authentification: Simple (sans JWT)`);
+  console.log(`🔐 Authentification: Simple par session`);
   console.log(`📡 Routes disponibles:`);
   console.log(`   - /api/health (santé du serveur)`);
   console.log(`   - /api/test (test de connectivité)`);

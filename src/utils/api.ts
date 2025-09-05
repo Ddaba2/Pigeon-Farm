@@ -1,4 +1,7 @@
 // Service API centralisé pour l'authentification par session
+import { getSessionId, setSessionId, removeSessionId, isLocalStorageAvailable } from './cookies';
+import { edgeLocalStorage } from './storageManager';
+
 class ApiService {
   private baseURL: string;
 
@@ -12,29 +15,53 @@ class ApiService {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
-    // Récupérer le sessionId du localStorage
-    const sessionId = localStorage.getItem('sessionId');
+    // Récupérer le sessionId (compatible Edge)
+    const sessionId = getSessionId();
+    
+    // Fallback: récupérer depuis localStorage si disponible
+    let finalSessionId = sessionId;
+    if (!finalSessionId && isLocalStorageAvailable()) {
+      try {
+        finalSessionId = edgeLocalStorage.getItem('sessionId');
+      } catch (error) {
+        console.warn('Erreur localStorage:', error);
+      }
+    }
+    
+    // Debug pour Edge
+    console.log(`🔍 Debug API ${endpoint}:`, {
+      sessionId: finalSessionId ? 'Présent' : 'Manquant',
+      sessionIdValue: finalSessionId,
+      cookies: document.cookie ? 'Présents' : 'Manquants',
+      cookiesValue: document.cookie,
+      url,
+      userAgent: navigator.userAgent,
+      isEdge: /Edg/.test(navigator.userAgent)
+    });
     
     // Configuration par défaut pour l'authentification par session
     const defaultOptions: RequestInit = {
       credentials: 'include', // Inclure les cookies de session
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest', // Pour la compatibilité Edge
+        ...(finalSessionId && { 'x-session-id': finalSessionId }),
         ...options.headers,
       },
       ...options,
     };
 
-    // Ajouter le sessionId dans l'en-tête si disponible
-    if (sessionId) {
-      defaultOptions.headers = {
-        ...defaultOptions.headers,
-        'x-session-id': sessionId,
-      };
-    }
-
     try {
-      const response = await fetch(url, defaultOptions);
+      // Utiliser fetch avec fallback XMLHttpRequest pour Edge Legacy
+      let response: Response;
+      
+      if (window.fetch) {
+        response = await fetch(url, defaultOptions);
+      } else {
+        // Fallback XMLHttpRequest pour Edge Legacy
+        response = await this.xhrRequest(url, defaultOptions);
+      }
       
       if (!response.ok) {
         if (response.status === 401) {
@@ -48,6 +75,53 @@ class ApiService {
       console.error(`Erreur API ${endpoint}:`, error);
       throw error;
     }
+  }
+
+  // Fallback XMLHttpRequest pour Edge Legacy
+  private xhrRequest(url: string, options: RequestInit): Promise<Response> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.open(options.method || 'GET', url, true);
+      
+      // Configurer les headers
+      if (options.headers) {
+        Object.entries(options.headers).forEach(([key, value]) => {
+          if (typeof value === 'string') {
+            xhr.setRequestHeader(key, value);
+          }
+        });
+      }
+      
+      // Configurer les credentials
+      if (options.credentials === 'include') {
+        xhr.withCredentials = true;
+      }
+      
+      xhr.onload = () => {
+        const response = new Response(xhr.responseText, {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: new Headers()
+        });
+        resolve(response);
+      };
+      
+      xhr.onerror = () => {
+        reject(new Error('Erreur réseau XMLHttpRequest'));
+      };
+      
+      xhr.ontimeout = () => {
+        reject(new Error('Timeout XMLHttpRequest'));
+      };
+      
+      // Envoyer la requête
+      if (options.body) {
+        xhr.send(options.body as string);
+      } else {
+        xhr.send();
+      }
+    });
   }
 
   // Authentification
@@ -86,10 +160,33 @@ class ApiService {
 
     const data = await response.json();
     
-    // Stocker les informations utilisateur (sans token)
+    // Stocker les informations utilisateur et sessionId
     if (data.success && data.user) {
-      localStorage.setItem('user', JSON.stringify(data.user));
-      localStorage.setItem('sessionId', data.sessionId);
+      try {
+        if (isLocalStorageAvailable()) {
+          edgeLocalStorage.setItem('user', JSON.stringify(data.user));
+        }
+        if (data.sessionId) {
+          setSessionId(data.sessionId);
+          console.log('✅ SessionId stocké:', data.sessionId);
+          
+          // Stocker aussi dans localStorage comme fallback
+          if (isLocalStorageAvailable()) {
+            try {
+              edgeLocalStorage.setItem('sessionId', data.sessionId);
+              console.log('💾 SessionId stocké dans localStorage');
+            } catch (error) {
+              console.warn('Erreur localStorage:', error);
+            }
+          }
+        }
+        
+        // Debug des cookies après connexion
+        console.log('🍪 Cookies après connexion:', document.cookie);
+      } catch (error) {
+        console.warn('Erreur lors du stockage:', error);
+        // Continuer sans stockage local
+      }
     }
 
     return data;
@@ -103,11 +200,18 @@ class ApiService {
         credentials: 'include',
       });
     } catch (error) {
-      console.error('Erreur lors de la déconnexion:', error);
+      // Silencieux - pas de message de console
     } finally {
       // Nettoyer le stockage local
-      localStorage.removeItem('user');
-      localStorage.removeItem('sessionId');
+      try {
+        if (isLocalStorageAvailable()) {
+          edgeLocalStorage.removeItem('user');
+        }
+        removeSessionId();
+      } catch (error) {
+        console.warn('Erreur lors du nettoyage:', error);
+        // Continuer sans nettoyage
+      }
     }
   }
 

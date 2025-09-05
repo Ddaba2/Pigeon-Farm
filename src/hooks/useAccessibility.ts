@@ -8,26 +8,28 @@ export interface AccessibilityPreferences {
 }
 
 export const useAccessibility = () => {
-  const [preferences, setPreferences] = useState<AccessibilityPreferences>({
-    highContrast: false,
-    largeText: false,
-    reducedMotion: false,
-    keyboardNavigation: false,
+  const [preferences, setPreferences] = useState<AccessibilityPreferences>(() => {
+    // Initialisation sécurisée sans localStorage dans useEffect
+    try {
+      const savedPreferences = localStorage.getItem('accessibility-preferences');
+      if (savedPreferences) {
+        return JSON.parse(savedPreferences);
+      }
+    } catch (error) {
+      // Silencieux
+    }
+    
+    return {
+      highContrast: false,
+      largeText: false,
+      reducedMotion: false,
+      keyboardNavigation: false,
+    };
   });
 
   const [isKeyboardUser, setIsKeyboardUser] = useState(false);
 
   useEffect(() => {
-    // Load preferences from localStorage
-    const savedPreferences = localStorage.getItem('accessibility-preferences');
-    if (savedPreferences) {
-      try {
-        setPreferences(JSON.parse(savedPreferences));
-      } catch (error) {
-        console.warn('Error parsing accessibility preferences:', error);
-      }
-    }
-
     // Check for system preferences
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     setPreferences(prev => ({
@@ -79,8 +81,12 @@ export const useAccessibility = () => {
       root.classList.remove('reduced-motion');
     }
 
-    // Save to localStorage
-    localStorage.setItem('accessibility-preferences', JSON.stringify(preferences));
+    // Save to localStorage de manière sécurisée
+    try {
+      localStorage.setItem('accessibility-preferences', JSON.stringify(preferences));
+    } catch (error) {
+      // Silencieux - pas de message de console
+    }
   }, [preferences]);
 
   const updatePreference = (key: keyof AccessibilityPreferences, value: boolean) => {

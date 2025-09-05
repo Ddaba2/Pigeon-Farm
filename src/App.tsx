@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LogOut, Moon, Sun } from 'lucide-react';
+import { isLocalStorageAvailable } from './utils/cookies';
+import { edgeLocalStorage } from './utils/storageManager';
+
 import Navigation from './components/Navigation';
 import Dashboard from './components/Dashboard';
 import CouplesManagement from './components/CouplesManagement';
@@ -12,30 +15,17 @@ import UsersManagement from './components/UsersManagement';
 import Documentation from './components/Documentation';
 import BackupRestore from './components/BackupRestore';
 import AccessibilityPanel from './components/AccessibilityPanel';
-import { AppData, User } from './types/types';
+import { User } from './types/types';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useAccessibility } from './hooks/useAccessibility';
 import { useKeyboardNavigation, createAppShortcuts } from './hooks/useKeyboardNavigation';
-// Notifications supprimées
-import { safeLocalStorage } from './utils/edgeCompatibility';
-
-const initialData: AppData = {
-  couples: [],
-  eggs: [],
-  pigeonneaux: [],
-  healthRecords: [],
-  users: [
-    { id: 1, username: 'admin', password: 'admin123', role: 'admin', email: 'dabadiallo694@gmail.com' },
-    { id: 2, username: 'user', password: 'user123', role: 'user', email: 'dabadiallo694@gmail.com' }
-  ]
-};
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [data, setData] = useState<AppData>(initialData);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAccessibilityPanelOpen, setIsAccessibilityPanelOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const { preferences } = useAccessibility();
@@ -44,7 +34,15 @@ function App() {
   const handleLogout = useCallback(() => {
     setCurrentUser(null);
     setActiveTab('dashboard');
-    safeLocalStorage.removeItem('token');
+    // Nettoyer le localStorage
+    try {
+      if (isLocalStorageAvailable()) {
+        edgeLocalStorage.removeItem('user');
+        edgeLocalStorage.removeItem('sessionId');
+      }
+    } catch (error) {
+      console.warn('Erreur lors de la déconnexion:', error);
+    }
   }, []);
 
   const handleAccessibilityToggle = useCallback(() => {
@@ -56,31 +54,56 @@ function App() {
     if (msg) setSuccessMessage(msg);
   }, []);
 
+  // Vérifier l'authentification au démarrage
+  useEffect(() => {
+    try {
+      // Forcer la déconnexion pour Edge (solution temporaire)
+      console.log('🔄 Forçage de la déconnexion pour Edge...');
+      setCurrentUser(null);
+      
+      if (isLocalStorageAvailable()) {
+        edgeLocalStorage.removeItem('user');
+        edgeLocalStorage.removeItem('sessionId');
+        console.log('🧹 localStorage nettoyé');
+      }
+      
+      // Nettoyer aussi les cookies
+      document.cookie = 'sessionId=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+      console.log('🧹 cookies nettoyés');
+      
+      console.log('✅ Prêt pour la connexion manuelle');
+    } catch (error) {
+      console.warn('Erreur lors de la vérification de l\'authentification:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Keyboard navigation
   const shortcuts = createAppShortcuts(setActiveTab, handleLogout, handleAccessibilityToggle);
   useKeyboardNavigation(shortcuts);
 
-  useEffect(() => {
-    const savedData = safeLocalStorage.getItem('pigeonBreedingData');
-    if (savedData) {
-      try {
-        setData(JSON.parse(savedData));
-      } catch (error) {
-        console.warn('Erreur lors du parsing des données sauvegardées:', error);
-      }
-    }
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    try {
-      const dataString = JSON.stringify(data);
-      safeLocalStorage.setItem('pigeonBreedingData', dataString);
-    } catch (error) {
-      console.warn('Erreur lors de la sauvegarde des données:', error);
-    }
-  }, [data]);
-
+  // Forcer l'affichage de la page de connexion si pas d'utilisateur
   if (!currentUser) {
+    console.log('🔒 Affichage de la page de connexion - currentUser:', currentUser);
+    return <Login onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  // Vérification supplémentaire pour Edge
+  if (!currentUser.id || !currentUser.username) {
+    console.log('🔒 Utilisateur invalide, affichage de la page de connexion');
+    setCurrentUser(null);
     return <Login onAuthSuccess={handleAuthSuccess} />;
   }
 
@@ -112,8 +135,8 @@ function App() {
     }
   };
 
-  return (
-      <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 ${preferences.largeText ? 'large-text' : ''}`}>
+    return (
+       <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 ${preferences.largeText ? 'large-text' : ''}`}>
         {/* Skip to main content link for screen readers */}
         <a href="#main-content" className="skip-link">
           Aller au contenu principal
@@ -150,7 +173,7 @@ function App() {
                 </span>
                 <button
                   onClick={toggleDarkMode}
-                  className="btn-accessible p-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 transition-all duration-200 focus-visible-ring"
+                  className="btn-accessible p-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 transition-colors duration-200 focus-visible-ring"
                   aria-label={isDarkMode ? 'Passer au mode clair' : 'Passer au mode sombre'}
                   title={isDarkMode ? 'Passer au mode clair' : 'Passer au mode sombre'}
                 >
@@ -181,12 +204,12 @@ function App() {
           </main>
         </div>
         
-        <AccessibilityPanel 
-          isOpen={isAccessibilityPanelOpen} 
-          onClose={() => setIsAccessibilityPanelOpen(false)} 
-        />
-      </div>
-  );
-}
+                 <AccessibilityPanel 
+           isOpen={isAccessibilityPanelOpen} 
+           onClose={() => setIsAccessibilityPanelOpen(false)} 
+         />
+       </div>
+   );
+ }
 
 export default App;

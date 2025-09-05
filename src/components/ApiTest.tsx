@@ -174,7 +174,7 @@ const ApiTest: React.FC = () => {
           <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
             <p><strong>URL API:</strong> http://localhost:3002/api</p>
             <p><strong>Base de données:</strong> MySQL (pigeon_manager)</p>
-            <p><strong>Authentification:</strong> JWT Token</p>
+            <p><strong>Authentification:</strong> Session Simple</p>
             <p><strong>Statut:</strong> {isLoading ? '⏳ Test en cours...' : '🟢 Prêt pour les tests'}</p>
           </div>
         </div>

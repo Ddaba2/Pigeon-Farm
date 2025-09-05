@@ -10,6 +10,7 @@ const { validateUser } = require('../utils/validation.js');
 const { asyncHandler } = require('../utils/errorHandler.js');
 const UserService = require('../services/userService.js');
 
+
 const router = express.Router();
 
 // Service d'authentification - Base de données MySQL uniquement
@@ -117,13 +118,23 @@ router.post('/login', asyncHandler(async (req, res) => {
     // Créer une session
     const sessionId = createSession(user);
     
-    // Définir le cookie de session
+    console.log('🍪 Setting cookie sessionId:', sessionId);
+    console.log('🌐 Request origin:', req.headers.origin);
+    console.log('🔗 Request host:', req.headers.host);
+    
+    // Définir le cookie de session (essai avec configuration minimale)
     res.cookie('sessionId', sessionId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000 // 24 heures
+      httpOnly: false,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000,
+      path: '/'
     });
+    
+    // Ajouter aussi le sessionId dans les headers de réponse
+    res.set('X-Session-ID', sessionId);
+    
+    console.log('✅ Cookie set, response headers:', res.getHeaders());
     
     res.json({
       success: true,
@@ -165,6 +176,8 @@ router.post('/logout', (req, res) => {
     message: 'Déconnexion réussie'
   });
 });
+
+
 
 // Route de vérification de l'utilisateur
 router.post('/verify', asyncHandler(async (req, res) => {
@@ -249,6 +262,8 @@ router.post('/forgot-password', asyncHandler(async (req, res) => {
     message: 'Si cet email existe, un lien de réinitialisation a été envoyé'
   });
 }));
+
+
 
 // Route de réinitialisation de mot de passe
 router.post('/reset-password', asyncHandler(async (req, res) => {

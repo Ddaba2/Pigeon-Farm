@@ -79,15 +79,9 @@ const globalErrorHandler = (err, req, res, next) => {
     error = new ConflictError(message);
   }
   
-  // Erreur JWT
-  if (err.name === 'JsonWebTokenError') {
-    const message = 'Token invalide';
-    error = new AuthenticationError(message);
-  }
-  
-  // Erreur JWT expiré
-  if (err.name === 'TokenExpiredError') {
-    const message = 'Token expiré';
+  // Erreur de session invalide
+  if (err.name === 'SessionError') {
+    const message = 'Session invalide';
     error = new AuthenticationError(message);
   }
   

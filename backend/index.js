@@ -26,22 +26,65 @@ const salesRouter = require('./routes/sales.js');
 const app = express();
 const port = config.port;
 
-// Configuration CORS
+// Configuration CORS compatible Edge
 const corsOptions = {
   origin: [
     'http://localhost:5173',
     'http://localhost:5174',
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    // Support pour Edge Enterprise et IE
+    'http://localhost:*',
+    'http://127.0.0.1:*'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-session-id']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With', 
+    'x-session-id',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers',
+    'Cache-Control',
+    'Pragma'
+  ],
+  exposedHeaders: [
+    'Set-Cookie',
+    'x-session-id',
+    'Access-Control-Allow-Credentials'
+  ],
+  optionsSuccessStatus: 200, // Pour la compatibilité IE/Edge Legacy
+  preflightContinue: false
 };
 
 // Configuration des middlewares
 app.use(cors(corsOptions));
+
+// Middleware spécifique pour Edge - Headers de compatibilité
+app.use((req, res, next) => {
+  // Headers pour la compatibilité Edge/IE
+  res.header('X-UA-Compatible', 'IE=edge');
+  res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.header('Pragma', 'no-cache');
+  res.header('Expires', '0');
+  
+  // Headers de sécurité compatibles Edge
+  res.header('X-Content-Type-Options', 'nosniff');
+  res.header('X-Frame-Options', 'SAMEORIGIN');
+  res.header('X-XSS-Protection', '1; mode=block');
+  
+  // Support pour les cookies SameSite
+  if (req.headers.cookie) {
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  
+  next();
+});
+
 app.use(helmetConfig);
 app.use(rateLimiter);
 app.use(securityLogger);
@@ -138,7 +181,7 @@ const server = app.listen(port, async () => {
   console.log(`📊 Mode: ${config.nodeEnv}`);
   console.log(`🌐 URL: http://localhost:${port}`);
   console.log(`🔒 Sécurité: Helmet, Rate Limiting, CORS configurés`);
-  console.log(`🔐 Authentification: Simple (sans JWT)`);
+  console.log(`🔐 Authentification: Simple par session`);
   console.log(`📡 Routes disponibles:`);
   console.log(`   - /api/health (santé du serveur)`);
   console.log(`   - /api/test (test de connectivité)`);

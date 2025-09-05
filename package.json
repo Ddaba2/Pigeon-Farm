@@ -7,11 +7,14 @@
     "dev": "vite",
     "dev:full": "concurrently \"npm run dev\" \"cd backend && npm start\"",
     "dev:edge": "cross-env EDGE_COMPATIBILITY=true npm run dev",
+    "dev:edge-full": "concurrently \"npm run dev:edge\" \"cd backend && npm start\"",
     "build": "vite build",
     "build:edge": "cross-env EDGE_COMPATIBILITY=true npm run build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start:backend": "cd backend && npm start"
+    "start:backend": "cd backend && npm start",
+    "test:edge": "node test-edge-compatibility.js",
+    "test:edge-full": "npm run dev:edge-full && timeout 10 && npm run test:edge"
   },
   "dependencies": {
     "jspdf": "^3.0.2",

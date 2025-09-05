@@ -143,8 +143,8 @@ async function testConnectivity() {
   console.log('\n5️⃣ Test sans authentification...');
   try {
     const noAuthResponse = await fetch(`${BASE_URL}/couples`);
-    console.log('📊 Statut sans auth:', noAuthResponse.status);
-    if (noAuthResponse.status === 401) {
+      console.log('📊 Statut sans auth:', noAuthResponse.status);
+  if (noAuthResponse.status === 401 || noAuthResponse.status === 403) {
       console.log('✅ Protection d\'authentification active');
     }
   } catch (error) {

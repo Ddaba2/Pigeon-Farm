@@ -152,7 +152,7 @@ export class PDFExporter {
     
     this.doc.setFontSize(7);
     this.doc.setTextColor(150, 150, 150);
-    this.doc.text('Email: contact@pigeonfarm.com • Tél: +223 83 78 40 97 • Site: www.pigeonfarm.com', 20, footerY);
+    this.doc.text('Email: contactpigeonfarm@gmail.com • Tél: +223 83 78 40 97 • Site: www.pigeonfarm.com', 20, footerY);
 
     // Numéro de page
     const pageInfo = this.doc.internal.getCurrentPageInfo();
@@ -172,7 +172,7 @@ export class PDFExporter {
         .filter(col => col.toLowerCase() !== 'id') // Exclure la colonne ID
         .map(col => {
           const value = item[col];
-          // Formater les nombres et dates
+          // Formater les nombres et datesh
           if (typeof value === 'number') {
             return value.toLocaleString('fr-FR');
           }
