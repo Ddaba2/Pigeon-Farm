@@ -508,3 +508,52 @@ export const updateUserAvatar = async (avatarUrl: string) => {
 export const deleteUserAccount = async (password: string, confirmDelete: string) => {
   return apiService.delete('/users/profile/me', { password, confirmDelete });
 };
+
+// ========== MÉTHODES DE NOTIFICATIONS ==========
+
+// Récupérer toutes les notifications
+export const getNotifications = async (limit = 50, offset = 0) => {
+  return apiService.get(`/notifications?limit=${limit}&offset=${offset}`);
+};
+
+// Récupérer les notifications non lues
+export const getUnreadNotifications = async () => {
+  return apiService.get('/notifications/unread');
+};
+
+// Compter les notifications non lues
+export const getNotificationCount = async () => {
+  return apiService.get('/notifications/count');
+};
+
+// Marquer une notification comme lue
+export const markNotificationAsRead = async (notificationId: number) => {
+  return apiService.put(`/notifications/${notificationId}/read`);
+};
+
+// Marquer toutes les notifications comme lues
+export const markAllNotificationsAsRead = async () => {
+  return apiService.put('/notifications/read-all');
+};
+
+// Supprimer une notification
+export const deleteNotification = async (notificationId: number) => {
+  return apiService.delete(`/notifications/${notificationId}`);
+};
+
+// Supprimer toutes les notifications lues
+export const deleteReadNotifications = async () => {
+  return apiService.delete('/notifications/read');
+};
+
+// Créer une notification (admin seulement)
+export const createNotification = async (userId: number, title: string, message: string, type = 'info') => {
+  return apiService.post('/notifications', { userId, title, message, type });
+};
+
+// ========== EXPORT DU SERVICE ==========
+
+// ========== EXPORT NOMÉ DU SERVICE ==========
+
+// Exporter apiService comme export nommé pour compatibilité
+export { apiService };

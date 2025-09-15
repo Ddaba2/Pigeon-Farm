@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Moon, Sun, Shield, Bird, AlertTriangle, User as UserIcon } from 'lucide-react';
+import { LogOut, Moon, Sun, Shield, Bird, AlertTriangle, User as UserIcon, Bell } from 'lucide-react';
 import Navigation from './components/Navigation';
 import Dashboard from './components/Dashboard';
 import CouplesManagement from './components/CouplesManagement';
@@ -13,10 +13,12 @@ import Documentation from './components/Documentation';
 import Profile from './components/Profile';
 import AdminPanel from './components/AdminPanel';
 import AdminDebug from './components/AdminDebug';
+import Notifications from './components/Notifications';
 import ErrorBoundary from './components/ErrorBoundary';
 import { User } from './types/types';
 import { useDarkMode } from './hooks/useDarkMode';
 import { edgeLocalStorage } from './utils/storageManager';
+import { getNotificationCount } from './utils/api';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -24,6 +26,8 @@ function App() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showAdminDebug, setShowAdminDebug] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
   const { isDark, toggleDark } = useDarkMode();
 
   useEffect(() => {
@@ -42,6 +46,30 @@ function App() {
       }
     }
   }, []);
+
+  // Charger le nombre de notifications non lues
+  const loadNotificationCount = async () => {
+    if (!user) return;
+    
+    try {
+      const response = await getNotificationCount();
+      if (response.success) {
+        setNotificationCount(response.data.count);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du nombre de notifications:', error);
+    }
+  };
+
+  // Charger le nombre de notifications quand l'utilisateur se connecte
+  useEffect(() => {
+    if (user) {
+      loadNotificationCount();
+      // Recharger toutes les 30 secondes
+      const interval = setInterval(loadNotificationCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   const handleAuthSuccess = (userData: User, message?: string) => {
     setUser(userData);
@@ -142,6 +170,20 @@ function App() {
                   </button>
                 )}
 
+                {/* Notifications Button */}
+                <button
+                  onClick={() => setShowNotifications(true)}
+                  className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  title="Notifications"
+                >
+                  <Bell className="h-5 w-5" />
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                      {notificationCount > 9 ? '9+' : notificationCount}
+                    </span>
+                  )}
+                </button>
+
                 {/* Toggle Dark Mode */}
                 <button
                   onClick={toggleDark}
@@ -234,6 +276,16 @@ function App() {
           <div className="fixed inset-0 z-50">
             <AdminDebug onClose={() => setShowAdminDebug(false)} />
           </div>
+        )}
+
+        {/* Notifications Modal */}
+        {showNotifications && (
+          <Notifications 
+            onClose={() => {
+              setShowNotifications(false);
+              loadNotificationCount(); // Recharger le compteur après fermeture
+            }} 
+          />
         )}
       </div>
     </ErrorBoundary>

@@ -28,6 +28,7 @@ const adminProfilesRouter = require('./routes/adminProfiles.js');
 const adminDashboardRouter = require('./routes/adminDashboard.js');
 const adminMetricsRouter = require('./routes/adminMetrics.js');
 const adminBackupRouter = require('./routes/adminBackup.js');
+const notificationsRouter = require('./routes/notifications.js');
 
 const app = express();
 const port = config.port;
@@ -169,6 +170,7 @@ app.use('/api/admin/profiles', adminProfilesRouter);
 app.use('/api/admin/dashboard', adminDashboardRouter);
 app.use('/api/admin', adminMetricsRouter);
 app.use('/api/admin/backup', adminBackupRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // Gestionnaire d'erreurs 404
 app.use(notFoundHandler);
