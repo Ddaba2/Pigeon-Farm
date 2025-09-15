@@ -26,7 +26,7 @@ const EdgeStorageError: React.FC<EdgeStorageErrorProps> = ({ onRetry, onContinue
       // Si ça marche, continuer
       onContinue();
     } catch (error) {
-      console.warn('Tentative de retry échouée:', error);
+      // Tentative de retry échouée
     } finally {
       setIsRetrying(false);
     }

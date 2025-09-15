@@ -34,7 +34,7 @@ const EggTracking: React.FC = () => {
           setEggs(response.data);
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des œufs:', error);
+        // console.error('Erreur lors du chargement des œufs:', error);
         showNotification('error', 'Erreur lors du chargement des données');
       }
     };
@@ -115,7 +115,7 @@ const EggTracking: React.FC = () => {
       setEditingEgg(null);
       resetForm();
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
+      // console.error('Erreur lors de la sauvegarde:', error);
       showNotification('error', 'Erreur lors de la sauvegarde de l\'enregistrement d\'œufs');
     }
   };
@@ -163,7 +163,7 @@ const EggTracking: React.FC = () => {
           showNotification('success', 'Enregistrement supprimé avec succès');
         }
       } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
+        // console.error('Erreur lors de la suppression:', error);
         showNotification('error', 'Erreur lors de la suppression de l\'enregistrement d\'œufs');
       }
     }

@@ -32,7 +32,7 @@ const PigeonnalManagement: React.FC = () => {
           setPigeonneaux(response.data);
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des pigeonneaux:', error);
+        // console.error('Erreur lors du chargement des pigeonneaux:', error);
         showNotification('error', 'Erreur lors du chargement des données');
       }
     };
@@ -120,7 +120,7 @@ const PigeonnalManagement: React.FC = () => {
       setEditingPigeonneau(null);
       resetForm();
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
+      // console.error('Erreur lors de la sauvegarde:', error);
       showNotification('error', 'Erreur lors de la sauvegarde du pigeonneau');
     }
   };
@@ -152,7 +152,7 @@ const PigeonnalManagement: React.FC = () => {
           showNotification('success', 'Pigeonneau supprimé avec succès');
         }
       } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
+        // console.error('Erreur lors de la suppression:', error);
         showNotification('error', 'Erreur lors de la suppression du pigeonneau');
       }
     }

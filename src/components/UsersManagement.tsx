@@ -37,15 +37,15 @@ function UsersManagement() {
           // Pas d'utilisateurs encore, c'est normal
           setUsers([]);
         } else {
-          console.warn('Structure de données inattendue:', response);
+          // console.warn('Structure de données inattendue:', response);
           setUsers([]);
         }
       } else {
-        console.warn('Données d\'utilisateurs invalides:', response);
+        // console.warn('Données d\'utilisateurs invalides:', response);
         setUsers([]);
       }
     } catch (err: any) {
-      console.error('Erreur lors du chargement des utilisateurs:', err);
+      // console.error('Erreur lors du chargement des utilisateurs:', err);
       setError(err.message || 'Erreur lors du chargement des utilisateurs');
       setUsers([]);
     } finally {
@@ -78,7 +78,7 @@ function UsersManagement() {
       });
       loadUsers();
     } catch (err: any) {
-      console.error('Erreur lors de la sauvegarde:', err);
+      // console.error('Erreur lors de la sauvegarde:', err);
       setError(err.message || 'Erreur lors de la sauvegarde');
     } finally {
       setLoading(false);
@@ -109,7 +109,7 @@ function UsersManagement() {
               await apiService.deleteUser(id);
       loadUsers();
     } catch (err: any) {
-      console.error('Erreur lors de la suppression:', err);
+      // console.error('Erreur lors de la suppression:', err);
       setError(err.message || 'Erreur lors de la suppression');
     } finally {
       setLoading(false);

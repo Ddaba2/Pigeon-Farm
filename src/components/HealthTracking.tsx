@@ -32,7 +32,7 @@ const HealthTracking: React.FC = () => {
           setRecords(response.data);
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des enregistrements de santé:', error);
+        // console.error('Erreur lors du chargement des enregistrements de santé:', error);
         showNotification('error', 'Erreur lors du chargement des données');
       }
     };
@@ -119,7 +119,7 @@ const HealthTracking: React.FC = () => {
       setEditingRecord(null);
       resetForm();
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
+      // console.error('Erreur lors de la sauvegarde:', error);
       showNotification('error', 'Erreur lors de la sauvegarde de l\'enregistrement de santé');
     }
   };
@@ -150,7 +150,7 @@ const HealthTracking: React.FC = () => {
           showNotification('success', 'Enregistrement supprimé avec succès');
         }
       } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
+        // console.error('Erreur lors de la suppression:', error);
         showNotification('error', 'Erreur lors de la suppression de l\'enregistrement de santé');
       }
     }

@@ -122,7 +122,7 @@ export const shouldUseFallback = (fallback: keyof EdgeConfig['optimizations']): 
 // Configuration des cookies pour Edge
 export const configureCookiesForEdge = (): void => {
   if (isEdgeBrowser()) {
-    console.log('🍪 Configuration des cookies pour Edge');
+    // console.log('🍪 Configuration des cookies pour Edge');
     
     // Override de la fonction setCookie pour Edge
     const originalSetCookie = (name: string, value: string, options: any = {}) => {
@@ -155,7 +155,7 @@ export const configureCookiesForEdge = (): void => {
       if (!document.cookie.includes(`${name}=${value}`)) {
         // Fallback sans SameSite
         document.cookie = `${name}=${value}; expires=${options.expires || ''}; path=${options.path || '/'}`;
-        console.log(`🍪 Cookie ${name} défini avec fallback Edge`);
+        // console.log(`🍪 Cookie ${name} défini avec fallback Edge`);
       }
     };
     
@@ -167,7 +167,7 @@ export const configureCookiesForEdge = (): void => {
 // Configuration des headers pour Edge
 export const configureHeadersForEdge = (): void => {
   if (isEdgeBrowser()) {
-    console.log('📋 Configuration des headers pour Edge');
+    // console.log('📋 Configuration des headers pour Edge');
     
     // Ajouter des meta tags pour la compatibilité
     if (document.head) {
@@ -193,31 +193,31 @@ export const configureHeadersForEdge = (): void => {
 // Configuration des APIs pour Edge
 export const configureAPIsForEdge = (): void => {
   if (isEdgeBrowser()) {
-    console.log('🔧 Configuration des APIs pour Edge');
+    // console.log('🔧 Configuration des APIs pour Edge');
     
     // Désactiver les service workers si problématiques
     if (edgeConfig.optimizations.disableServiceWorkers) {
-      console.log('⚠️ Service Workers désactivés pour Edge');
+      // console.log('⚠️ Service Workers désactivés pour Edge');
       // Service workers peuvent causer des problèmes avec Edge Legacy
     }
     
     // Configurer les timeouts pour les requêtes
     if (edgeConfig.optimizations.useXHRFallback) {
-      console.log('⚠️ Utilisation du fallback XMLHttpRequest pour Edge');
+      // console.log('⚠️ Utilisation du fallback XMLHttpRequest pour Edge');
     }
   }
 };
 
 // Initialisation de la configuration Edge
 export const initializeEdgeConfig = (): void => {
-  console.log('🚀 Initialisation de la configuration Edge');
-  console.log('📊 Configuration Edge:', edgeConfig);
+  // console.log('🚀 Initialisation de la configuration Edge');
+  // console.log('📊 Configuration Edge:', edgeConfig);
   
   configureCookiesForEdge();
   configureHeadersForEdge();
   configureAPIsForEdge();
   
-  console.log('✅ Configuration Edge initialisée');
+  // console.log('✅ Configuration Edge initialisée');
 };
 
 // Export par défaut

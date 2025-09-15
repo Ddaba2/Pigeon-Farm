@@ -1,8 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { LogOut, Moon, Sun } from 'lucide-react';
-import { isLocalStorageAvailable } from './utils/cookies';
-import { edgeLocalStorage } from './utils/storageManager';
-
+import React, { useState, useEffect } from 'react';
+import { LogOut, Moon, Sun, Shield, Bird, AlertTriangle, User as UserIcon } from 'lucide-react';
 import Navigation from './components/Navigation';
 import Dashboard from './components/Dashboard';
 import CouplesManagement from './components/CouplesManagement';
@@ -13,104 +10,65 @@ import Statistics from './components/Statistics';
 import Login from './components/Login';
 import UsersManagement from './components/UsersManagement';
 import Documentation from './components/Documentation';
-import BackupRestore from './components/BackupRestore';
-import AccessibilityPanel from './components/AccessibilityPanel';
+import Profile from './components/Profile';
+import AdminPanel from './components/AdminPanel';
+import AdminDebug from './components/AdminDebug';
+import ErrorBoundary from './components/ErrorBoundary';
 import { User } from './types/types';
 import { useDarkMode } from './hooks/useDarkMode';
-import { useAccessibility } from './hooks/useAccessibility';
-import { useKeyboardNavigation, createAppShortcuts } from './hooks/useKeyboardNavigation';
+import { edgeLocalStorage } from './utils/storageManager';
 
 function App() {
+  const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAccessibilityPanelOpen, setIsAccessibilityPanelOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  
-  const { isDarkMode, toggleDarkMode } = useDarkMode();
-  const { preferences } = useAccessibility();
-  
-  // Mémorisation des fonctions pour éviter les re-renders
-  const handleLogout = useCallback(() => {
-    setCurrentUser(null);
-    setActiveTab('dashboard');
-    // Nettoyer le localStorage
-    try {
-      if (isLocalStorageAvailable()) {
-        edgeLocalStorage.removeItem('user');
-        edgeLocalStorage.removeItem('sessionId');
-      }
-    } catch (error) {
-      console.warn('Erreur lors de la déconnexion:', error);
-    }
-  }, []);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showAdminDebug, setShowAdminDebug] = useState(false);
+  const { isDark, toggleDark } = useDarkMode();
 
-  const handleAccessibilityToggle = useCallback(() => {
-    setIsAccessibilityPanelOpen(!isAccessibilityPanelOpen);
-  }, [isAccessibilityPanelOpen]);
-
-  const handleAuthSuccess = useCallback((user: User, msg?: string) => {
-    setCurrentUser(user);
-    if (msg) setSuccessMessage(msg);
-  }, []);
-
-  // Vérifier l'authentification au démarrage
   useEffect(() => {
-    try {
-      // Forcer la déconnexion pour Edge (solution temporaire)
-      console.log('🔄 Forçage de la déconnexion pour Edge...');
-      setCurrentUser(null);
-      
-      if (isLocalStorageAvailable()) {
+    const userData = edgeLocalStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        setUser(user);
+        // Si l'utilisateur est admin, ouvrir directement l'interface admin
+        if (user.role === 'admin') {
+          setShowAdminPanel(true);
+        }
+      } catch (error) {
+        // console.error('Erreur lors du parsing des données utilisateur:', error);
         edgeLocalStorage.removeItem('user');
-        edgeLocalStorage.removeItem('sessionId');
-        console.log('🧹 localStorage nettoyé');
       }
-      
-      // Nettoyer aussi les cookies
-      document.cookie = 'sessionId=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
-      console.log('🧹 cookies nettoyés');
-      
-      console.log('✅ Prêt pour la connexion manuelle');
-    } catch (error) {
-      console.warn('Erreur lors de la vérification de l\'authentification:', error);
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
-  // Keyboard navigation
-  const shortcuts = createAppShortcuts(setActiveTab, handleLogout, handleAccessibilityToggle);
-  useKeyboardNavigation(shortcuts);
+  const handleAuthSuccess = (userData: User, message?: string) => {
+    setUser(userData);
+    // Si l'utilisateur est admin, ouvrir directement l'interface admin
+    if (userData.role === 'admin') {
+      setShowAdminPanel(true);
+    }
+    if (message) {
+      setSuccessMessage(message);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    }
+  };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Chargement...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleLogout = () => {
+    edgeLocalStorage.removeItem('user');
+    setUser(null);
+    setActiveTab('dashboard');
+    setShowAdminPanel(false);
+    setShowAdminDebug(false);
+  };
 
-  // Forcer l'affichage de la page de connexion si pas d'utilisateur
-  if (!currentUser) {
-    console.log('🔒 Affichage de la page de connexion - currentUser:', currentUser);
-    return <Login onAuthSuccess={handleAuthSuccess} />;
-  }
-
-  // Vérification supplémentaire pour Edge
-  if (!currentUser.id || !currentUser.username) {
-    console.log('🔒 Utilisateur invalide, affichage de la page de connexion');
-    setCurrentUser(null);
+  if (!user) {
     return <Login onAuthSuccess={handleAuthSuccess} />;
   }
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard onNavigate={setActiveTab} />;
       case 'couples':
         return <CouplesManagement />;
       case 'eggs':
@@ -123,93 +81,163 @@ function App() {
         return <Statistics />;
       case 'users':
         return <UsersManagement />;
-      case 'backup':
-        return currentUser?.role === 'admin' ? <BackupRestore /> : null;
+      case 'profile':
+        return <Profile user={user} onUpdate={setUser} />;
       case 'help':
         return <Documentation />;
       default:
-        return <div className="p-8 text-center">
-          <h1 className="text-2xl font-bold mb-4">Page Non Trouvée</h1>
-          <p className="text-gray-600">Cette page n'existe pas ou a été supprimée</p>
-        </div>;
+        return <Dashboard />;
     }
   };
 
-    return (
-       <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 ${preferences.largeText ? 'large-text' : ''}`}>
-        {/* Skip to main content link for screen readers */}
-        <a href="#main-content" className="skip-link">
-          Aller au contenu principal
-        </a>
-        
-        {successMessage && (
-          <div className="max-w-2xl mx-auto mt-4 mb-2 p-3 bg-green-100 text-green-800 rounded shadow text-center font-semibold" role="alert" aria-live="polite">
-            {successMessage}
-            <button 
-              onClick={() => setSuccessMessage(null)} 
-              className="ml-2 text-green-900 font-bold btn-accessible"
-              aria-label="Fermer le message de succès"
-            >
-              ×
-            </button>
-          </div>
-        )}
-        
-        <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700" role="banner">
+  return (
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+        {/* Header */}
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <img
-                  src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png"
-                  alt="Logo PigeonFarm - Application de gestion d'élevage de pigeons"
-                  className="h-8 w-8 mr-3"
-                />
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">PigeonFarm</h1>
-              </div>
+            <div className="flex items-center justify-between h-16">
               <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  <span className="sr-only">Utilisateur connecté : </span>
-                  {currentUser.username}
-                </span>
+                <div className="flex items-center space-x-3">
+                  <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
+                    <img 
+                      src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png" 
+                      alt="PigeonFarm Logo" 
+                      className="h-full w-full object-contain"
+                      onError={(e) => {
+                        // Fallback vers l'icône Bird si l'image ne charge pas
+                        e.currentTarget.style.display = 'none';
+                        const fallback = document.createElement('div');
+                        fallback.className = 'w-14 h-14 bg-gradient-to-br from-blue-500 to-green-500 rounded-xl flex items-center justify-center';
+                        fallback.innerHTML = '<svg class="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>';
+                        e.currentTarget.parentNode?.appendChild(fallback);
+                      }}
+                    />
+                  </div>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">PigeonFarm</h1>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                {/* Admin Panel Button */}
+                {user.role === 'admin' && (
+                  <button
+                    onClick={() => setShowAdminPanel(true)}
+                    className="flex items-center space-x-2 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+                  >
+                    <Shield className="h-4 w-4" />
+                    <span className="text-sm font-medium">Admin</span>
+                  </button>
+                )}
+
+                {/* Admin Debug Button - visible pour tous les utilisateurs admin */}
+                {user.role === 'admin' && (
+                  <button
+                    onClick={() => setShowAdminDebug(true)}
+                    className="flex items-center space-x-2 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-yellow-600 dark:hover:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors"
+                    title="Diagnostic Admin"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Debug</span>
+                  </button>
+                )}
+
+                {/* Toggle Dark Mode */}
                 <button
-                  onClick={toggleDarkMode}
-                  className="btn-accessible p-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 transition-colors duration-200 focus-visible-ring"
-                  aria-label={isDarkMode ? 'Passer au mode clair' : 'Passer au mode sombre'}
-                  title={isDarkMode ? 'Passer au mode clair' : 'Passer au mode sombre'}
+                  onClick={toggleDark}
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  {isDarkMode ? <Sun className="h-5 w-5" aria-hidden="true" /> : <Moon className="h-5 w-5" aria-hidden="true" />}
+                  {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </button>
-                <button
-                  onClick={handleLogout}
-                  className="btn-accessible flex items-center text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors font-semibold focus-visible-ring"
-                  aria-label="Se déconnecter"
-                >
-                  <LogOut className="h-5 w-5" aria-hidden="true" />
-                  <span className="sr-only">Déconnexion</span>
-                </button>
+                
+                {/* User Menu */}
+                <div className="flex items-center space-x-3">
+                  {/* User Avatar and Name */}
+                  <div className="flex items-center space-x-3">
+                    <div 
+                      onClick={() => setActiveTab('profile')}
+                      className="flex flex-col items-center space-y-1 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg p-2 transition-colors"
+                      title="Mon Profil"
+                    >
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 border-2 border-gray-300">
+                        {user.avatar_url ? (
+                          <img
+                            src={user.avatar_url}
+                            alt="Avatar"
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`h-full w-full flex items-center justify-center ${user.avatar_url ? 'hidden' : ''}`}>
+                          <UserIcon className="h-5 w-5 text-gray-400" />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-medium text-gray-900 dark:text-white">{user.full_name || user.username}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center space-x-2 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="text-sm font-medium">Déconnexion</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </header>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Navigation 
-            activeTab={activeTab} 
-            setActiveTab={setActiveTab} 
-            userRole={currentUser.role} 
-            onAccessibilityToggle={handleAccessibilityToggle}
-          />
-          <main id="main-content" className="mt-8" role="main" aria-label="Contenu principal">
-            {renderContent()}
+        {/* Main Content - Masqué quand l'admin panel est ouvert ou pour les admins */}
+        {!showAdminPanel && !showAdminDebug && user.role !== 'admin' && (
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {/* Success Message */}
+            {successMessage && (
+              <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-lg">
+                {successMessage}
+              </div>
+            )}
+
+            {/* Navigation */}
+            <Navigation 
+              activeTab={activeTab} 
+              setActiveTab={setActiveTab} 
+              userRole={user.role} 
+              onAccessibilityToggle={() => {}} 
+            />
+
+            {/* Page Content */}
+            <div className="animate-in fade-in duration-300">
+              {renderContent()}
+            </div>
           </main>
-        </div>
-        
-                 <AccessibilityPanel 
-           isOpen={isAccessibilityPanelOpen} 
-           onClose={() => setIsAccessibilityPanelOpen(false)} 
-         />
-       </div>
-   );
- }
+        )}
+
+        {/* Admin Panel Modal */}
+        {showAdminPanel && (
+          <div className="fixed inset-0 z-50">
+            <AdminPanel 
+              onClose={() => setShowAdminPanel(false)} 
+              onOpenDebug={() => setShowAdminDebug(true)}
+            />
+          </div>
+        )}
+
+        {/* Admin Debug Modal */}
+        {showAdminDebug && (
+          <div className="fixed inset-0 z-50">
+            <AdminDebug onClose={() => setShowAdminDebug(false)} />
+          </div>
+        )}
+      </div>
+    </ErrorBoundary>
+  );
+}
 
 export default App;

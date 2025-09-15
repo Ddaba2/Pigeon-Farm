@@ -4,9 +4,17 @@ export interface User {
   password: string;
   role: 'admin' | 'user';
   email: string;
+  status: 'active' | 'blocked' | 'pending';
   // Propriétés supplémentaires utilisées dans les composants
   full_name?: string;
+  avatar_url?: string;
+  phone?: string;
+  address?: string;
+  bio?: string;
   created_at?: string;
+  updated_at?: string;
+  last_login?: string;
+  login_attempts?: number;
 }
 
 export interface Couple {

@@ -11,7 +11,7 @@ export const useDarkMode = () => {
       }
       return false;
     } catch (error) {
-      console.warn('Erreur lors de la lecture du mode sombre:', error);
+      // console.warn('Erreur lors de la lecture du mode sombre:', error);
       return false;
     }
   });
@@ -34,10 +34,10 @@ export const useDarkMode = () => {
     try {
       if (isEdgeLocalStorageAvailable()) {
         edgeLocalStorage.setItem('darkMode', JSON.stringify(newMode));
-        console.log(`🌙 Mode sombre ${newMode ? 'activé' : 'désactivé'}`);
+        // console.log(`🌙 Mode sombre ${newMode ? 'activé' : 'désactivé'}`);
       }
     } catch (error) {
-      console.warn('Erreur lors de la sauvegarde du mode sombre:', error);
+      // console.warn('Erreur lors de la sauvegarde du mode sombre:', error);
     }
   };
 

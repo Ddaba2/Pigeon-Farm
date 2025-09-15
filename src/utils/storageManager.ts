@@ -56,9 +56,9 @@ class EdgeStorageManager {
       window.localStorage.setItem(testKey, 'test');
       window.localStorage.removeItem(testKey);
       this.localStorageImpl = window.localStorage;
-      console.log('✅ localStorage Edge accessible');
+      // localStorage Edge accessible
     } catch (error) {
-      console.log('🔧 localStorage Edge bloqué, utilisation du stockage en mémoire');
+      // localStorage Edge bloqué, utilisation du stockage en mémoire
       this.localStorageImpl = new MemoryStorage();
       this.isLocalStorageBlocked = true;
     }
@@ -69,9 +69,9 @@ class EdgeStorageManager {
       window.sessionStorage.setItem(testKey, 'test');
       window.sessionStorage.removeItem(testKey);
       this.sessionStorageImpl = window.sessionStorage;
-      console.log('✅ sessionStorage Edge accessible');
+      // sessionStorage Edge accessible
     } catch (error) {
-      console.log('🔧 sessionStorage Edge bloqué, utilisation du stockage en mémoire');
+      // sessionStorage Edge bloqué, utilisation du stockage en mémoire
       this.sessionStorageImpl = new MemoryStorage();
       this.isSessionStorageBlocked = true;
     }

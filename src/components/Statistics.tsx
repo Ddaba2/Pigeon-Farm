@@ -106,7 +106,7 @@ const Statistics: React.FC = () => {
           });
         }
     } catch (error) {
-      console.error('Erreur lors du chargement des statistiques:', error);
+      // Erreur chargement statistiques ignorée
       }
     };
 
@@ -117,7 +117,7 @@ const Statistics: React.FC = () => {
           setSales(response.data);
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des ventes:', error);
+        // Erreur chargement ventes ignorée
       }
     };
 
@@ -198,7 +198,7 @@ const Statistics: React.FC = () => {
       setEditingSale(null);
       resetForm();
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
+      // Erreur sauvegarde ignorée
       alert('Erreur lors de la sauvegarde de la vente');
     }
   };
@@ -230,7 +230,7 @@ const Statistics: React.FC = () => {
           setSales(sales.filter(s => s.id !== confirmationModal.saleId));
         }
       } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
+        // Erreur suppression ignorée
         alert('Erreur lors de la suppression de la vente');
       }
     }

@@ -47,6 +47,24 @@ const authenticateUser = (req, res, next) => {
       });
     }
     
+    // Vérifier le statut de l'utilisateur
+    if (session.user.status === 'blocked') {
+      console.log('🚫 Blocked user attempted access:', session.user.username);
+      activeSessions.delete(sessionId); // Supprimer la session
+      return res.status(403).json({ 
+        error: 'Votre compte a été bloqué. Contactez un administrateur.',
+        code: 'ACCOUNT_BLOCKED'
+      });
+    }
+    
+    if (session.user.status === 'pending') {
+      console.log('⏳ Pending user attempted access:', session.user.username);
+      return res.status(403).json({ 
+        error: 'Votre compte est en attente d\'approbation.',
+        code: 'ACCOUNT_PENDING'
+      });
+    }
+    
     // Ajouter l'utilisateur à la requête
     req.user = session.user;
     console.log('✅ Authentification réussie pour:', session.user.username);
@@ -64,7 +82,7 @@ const authenticateUser = (req, res, next) => {
 const createSession = (user) => {
   const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   const session = {
-    user: { id: user.id, username: user.username, role: user.role },
+    user: { id: user.id, username: user.username, role: user.role, status: user.status },
     createdAt: Date.now()
   };
   

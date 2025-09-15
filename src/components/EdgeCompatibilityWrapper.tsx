@@ -9,6 +9,7 @@ const EdgeCompatibilityWrapper: React.FC<EdgeCompatibilityWrapperProps> = ({ chi
   const [isEdgeCompatible, setIsEdgeCompatible] = useState(false);
   const [compatibilityIssues, setCompatibilityIssues] = useState<string[]>([]);
   const [hasStorageError, setHasStorageError] = useState(false);
+  const [hasLoggedIssues, setHasLoggedIssues] = useState(false);
 
   useEffect(() => {
     const checkCompatibility = () => {
@@ -18,12 +19,6 @@ const EdgeCompatibilityWrapper: React.FC<EdgeCompatibilityWrapperProps> = ({ chi
       const isEdge = /Edg/.test(navigator.userAgent);
       const isIE = /Trident/.test(navigator.userAgent);
       
-      console.log('🔍 Détection navigateur:', {
-        userAgent: navigator.userAgent,
-        isEdge,
-        isIE,
-        isChrome: /Chrome/.test(navigator.userAgent)
-      });
 
       // Vérifier les APIs critiques
       if (!window.fetch) {
@@ -60,14 +55,8 @@ const EdgeCompatibilityWrapper: React.FC<EdgeCompatibilityWrapperProps> = ({ chi
         }
       }
       
-      // Vérifier les APIs modernes
-      if (!window.IntersectionObserver) {
-        issues.push('IntersectionObserver non supporté');
-      }
-      
-      if (!window.ResizeObserver) {
-        issues.push('ResizeObserver non supporté');
-      }
+      // Vérifier les APIs modernes (optionnelles)
+      // IntersectionObserver et ResizeObserver non critiques
       
       // Vérifier les fonctionnalités ES6+
       try {
@@ -94,33 +83,38 @@ const EdgeCompatibilityWrapper: React.FC<EdgeCompatibilityWrapperProps> = ({ chi
         issues.push(`Erreur ES6+: ${error}`);
       }
       
-      // Vérifier les cookies
-      try {
-        document.cookie = 'test=edge-compat; SameSite=Lax';
-        const cookieTest = document.cookie.includes('test=edge-compat');
-        if (!cookieTest) {
-          issues.push('Cookies SameSite non supportés');
+      // Vérifier les cookies (test optionnel - désactivé pour éviter les faux positifs)
+      // Note: Les cookies SameSite sont optionnels et ne bloquent pas l'application
+      const testCookies = false; // Mettre à true si vous avez besoin des cookies SameSite
+      
+      if (testCookies) {
+        try {
+          const testCookie = 'edge_compat_test=1; SameSite=Lax; Path=/';
+          document.cookie = testCookie;
+          const cookieTest = document.cookie.includes('edge_compat_test=1');
+          // Cookies SameSite non critiques
+          // Nettoyer le cookie de test
+          document.cookie = 'edge_compat_test=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        } catch (error) {
+          // Test des cookies échoué (non critique)
         }
-        // Nettoyer le cookie de test
-        document.cookie = 'test=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      } catch (error) {
-        issues.push('Erreur cookies: ' + error);
       }
       
-      // Vérifier les headers de sécurité
-      if (!window.Headers) {
-        issues.push('Headers API non supportée');
-      }
+      // Vérifier les APIs Fetch (optionnelles pour compatibilité)
+      // Headers, Request, Response APIs optionnelles
       
-      if (!window.Request) {
-        issues.push('Request API non supportée');
-      }
+      // Filtrer les problèmes critiques seulement
+      const criticalIssues = issues.filter(issue => 
+        !issue.includes('IntersectionObserver') && 
+        !issue.includes('ResizeObserver') &&
+        !issue.includes('Headers API') &&
+        !issue.includes('Request API') &&
+        !issue.includes('Response API') &&
+        !issue.includes('Cookies SameSite') &&
+        !issue.includes('cookies')
+      );
       
-      if (!window.Response) {
-        issues.push('Response API non supportée');
-      }
-      
-      setCompatibilityIssues(issues);
+      setCompatibilityIssues(criticalIssues);
       
       // Appliquer les polyfills nécessaires
       applyPolyfills();
@@ -134,28 +128,12 @@ const EdgeCompatibilityWrapper: React.FC<EdgeCompatibilityWrapperProps> = ({ chi
     };
 
     const applyPolyfills = () => {
-      // Polyfill pour fetch si nécessaire
-      if (!window.fetch) {
-        console.warn('⚠️ Fetch non disponible, utilisation de XMLHttpRequest');
-        // Le polyfill sera géré dans api.ts
-      }
-      
-      // Polyfill pour Promise si nécessaire
-      if (!window.Promise) {
-        console.warn('⚠️ Promise non disponible');
-        // Utiliser une bibliothèque de polyfill
-      }
-      
-      // Polyfill pour localStorage
+      // Polyfills appliqués silencieusement
       if (!window.localStorage) {
-        console.warn('⚠️ localStorage non disponible');
-        // Créer un fallback en mémoire
         (window as any).localStorage = createMemoryStorage();
       }
       
-      // Polyfill pour sessionStorage
       if (!window.sessionStorage) {
-        console.warn('⚠️ sessionStorage non disponible');
         (window as any).sessionStorage = createMemoryStorage();
       }
     };
@@ -173,17 +151,7 @@ const EdgeCompatibilityWrapper: React.FC<EdgeCompatibilityWrapperProps> = ({ chi
     };
 
     const configureForEdge = () => {
-      console.log('🔧 Configuration spécifique Edge activée');
-      
-      // Désactiver certaines fonctionnalités problématiques
-      if (window.navigator && window.navigator.serviceWorker) {
-        // Edge peut avoir des problèmes avec les service workers
-        console.log('⚠️ Service Workers désactivés pour Edge');
-      }
-      
-      // Configuration des cookies pour Edge
-      const originalSetCookie = document.cookie;
-      console.log('🍪 Configuration cookies Edge');
+      // Configuration spécifique Edge
       
       // Ajouter des headers de sécurité pour Edge
       if (document.head) {
@@ -197,10 +165,7 @@ const EdgeCompatibilityWrapper: React.FC<EdgeCompatibilityWrapperProps> = ({ chi
     checkCompatibility();
   }, []);
 
-  // Afficher les problèmes de compatibilité en mode développement
-  if (process.env.NODE_ENV === 'development' && compatibilityIssues.length > 0) {
-    console.warn('⚠️ Problèmes de compatibilité détectés:', compatibilityIssues);
-  }
+  // Logs de compatibilité désactivés
 
   const handleStorageRetry = () => {
     setHasStorageError(false);

@@ -3,7 +3,7 @@
 
 // Polyfill pour fetch si non disponible
 if (!window.fetch) {
-  console.log('🔧 Chargement du polyfill fetch pour Edge Legacy');
+  // // console.log('🔧 Chargement du polyfill fetch pour Edge Legacy');
   
   (window as any).fetch = function(url: string, options: RequestInit = {}): Promise<Response> {
     return new Promise((resolve, reject) => {
@@ -54,7 +54,7 @@ if (!window.fetch) {
 
 // Polyfill pour Promise si non disponible
 if (!window.Promise) {
-  console.log('🔧 Chargement du polyfill Promise pour Edge Legacy');
+  // // console.log('🔧 Chargement du polyfill Promise pour Edge Legacy');
   
   // Polyfill simple pour Promise
   (window as any).Promise = function(executor: (resolve: Function, reject: Function) => void) {
@@ -157,7 +157,7 @@ if (!window.Promise) {
 
 // Polyfill pour Object.assign si non disponible
 if (!Object.assign) {
-  console.log('🔧 Chargement du polyfill Object.assign pour Edge Legacy');
+  // // console.log('🔧 Chargement du polyfill Object.assign pour Edge Legacy');
   
   Object.assign = function(target: any, ...sources: any[]) {
     if (target == null) {
@@ -183,7 +183,7 @@ if (!Object.assign) {
 
 // Polyfill pour Array.from si non disponible
 if (!Array.from) {
-  console.log('🔧 Chargement du polyfill Array.from pour Edge Legacy');
+  // // console.log('🔧 Chargement du polyfill Array.from pour Edge Legacy');
   
   Array.from = function(arrayLike: any, mapFn?: Function, thisArg?: any) {
     const items = Object(arrayLike);
@@ -201,7 +201,7 @@ if (!Array.from) {
 
 // Polyfill pour Array.includes si non disponible
 if (!Array.prototype.includes) {
-  console.log('🔧 Chargement du polyfill Array.includes pour Edge Legacy');
+  // // console.log('🔧 Chargement du polyfill Array.includes pour Edge Legacy');
   
   Array.prototype.includes = function(searchElement: any, fromIndex?: number) {
     const O = Object(this);
@@ -224,7 +224,7 @@ if (!Array.prototype.includes) {
 
 // Polyfill pour String.includes si non disponible
 if (!String.prototype.includes) {
-  console.log('🔧 Chargement du polyfill String.includes pour Edge Legacy');
+  // // console.log('🔧 Chargement du polyfill String.includes pour Edge Legacy');
   
   String.prototype.includes = function(search: string, start?: number) {
     if (typeof start !== 'number') {
@@ -248,7 +248,7 @@ const createStoragePolyfill = () => {
       try {
         return storage[key] || null;
       } catch (error) {
-        console.warn('Erreur localStorage.getItem:', error);
+        // // console.warn('Erreur localStorage.getItem:', error);
         return null;
       }
     },
@@ -256,21 +256,21 @@ const createStoragePolyfill = () => {
       try {
         storage[key] = value;
       } catch (error) {
-        console.warn('Erreur localStorage.setItem:', error);
+        // // console.warn('Erreur localStorage.setItem:', error);
       }
     },
     removeItem: (key: string) => {
       try {
         delete storage[key];
       } catch (error) {
-        console.warn('Erreur localStorage.removeItem:', error);
+        // // console.warn('Erreur localStorage.removeItem:', error);
       }
     },
     clear: () => {
       try {
         Object.keys(storage).forEach(key => delete storage[key]);
       } catch (error) {
-        console.warn('Erreur localStorage.clear:', error);
+        // // console.warn('Erreur localStorage.clear:', error);
       }
     },
     get length() { 
@@ -296,9 +296,9 @@ try {
   const testKey = '__localStorage_test__';
   localStorage.setItem(testKey, 'test');
   localStorage.removeItem(testKey);
-  console.log('✅ localStorage accessible');
+  // // console.log('✅ localStorage accessible');
 } catch (error) {
-  console.log('🔧 localStorage bloqué par Edge, utilisation du polyfill');
+  // // console.log('🔧 localStorage bloqué par Edge, utilisation du polyfill');
   
   // Créer un proxy pour localStorage qui utilise notre polyfill
   const localStoragePolyfill = createStoragePolyfill();
@@ -312,7 +312,7 @@ try {
     });
   } catch (defineError) {
     // Si Object.defineProperty échoue, utiliser une approche alternative
-    console.log('⚠️ Impossible de remplacer localStorage, utilisation du proxy');
+    // // console.log('⚠️ Impossible de remplacer localStorage, utilisation du proxy');
     
     // Créer un proxy global pour localStorage
     (window as any).__localStoragePolyfill = localStoragePolyfill;
@@ -336,9 +336,9 @@ try {
   const testKey = '__sessionStorage_test__';
   sessionStorage.setItem(testKey, 'test');
   sessionStorage.removeItem(testKey);
-  console.log('✅ sessionStorage accessible');
+  // // console.log('✅ sessionStorage accessible');
 } catch (error) {
-  console.log('🔧 sessionStorage bloqué par Edge, utilisation du polyfill');
+  // // console.log('🔧 sessionStorage bloqué par Edge, utilisation du polyfill');
   
   // Créer un proxy pour sessionStorage qui utilise notre polyfill
   const sessionStoragePolyfill = createStoragePolyfill();
@@ -352,7 +352,7 @@ try {
     });
   } catch (defineError) {
     // Si Object.defineProperty échoue, utiliser une approche alternative
-    console.log('⚠️ Impossible de remplacer sessionStorage, utilisation du proxy');
+    // // console.log('⚠️ Impossible de remplacer sessionStorage, utilisation du proxy');
     
     // Créer un proxy global pour sessionStorage
     (window as any).__sessionStoragePolyfill = sessionStoragePolyfill;
@@ -372,7 +372,7 @@ try {
 
 // Polyfill pour JSON si non disponible
 if (!window.JSON) {
-  console.log('🔧 Chargement du polyfill JSON pour Edge Legacy');
+  // // console.log('🔧 Chargement du polyfill JSON pour Edge Legacy');
   
   (window as any).JSON = {
     parse: function(text: string) {
@@ -404,18 +404,18 @@ const isEdge = /Edg/.test(navigator.userAgent);
 const isIELegacy = /Trident/.test(navigator.userAgent);
 
 if (isEdge || isIELegacy) {
-  console.log('🔧 Configuration spécifique Edge/IE activée');
+  // // console.log('🔧 Configuration spécifique Edge/IE activée');
   
   // Désactiver certaines fonctionnalités problématiques
   if (window.navigator && window.navigator.serviceWorker) {
-    console.log('⚠️ Service Workers désactivés pour Edge/IE');
+    // // console.log('⚠️ Service Workers désactivés pour Edge/IE');
     // Service workers peuvent causer des problèmes avec Edge Legacy
   }
   
   // Configuration des cookies pour Edge
   const originalCookieDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
   if (originalCookieDescriptor) {
-    console.log('🍪 Configuration cookies Edge/IE');
+    // // console.log('🍪 Configuration cookies Edge/IE');
   }
   
   // Ajouter des meta tags pour la compatibilité
@@ -432,4 +432,4 @@ if (isEdge || isIELegacy) {
   }
 }
 
-console.log('✅ Polyfills Edge chargés avec succès');
+// // console.log('✅ Polyfills Edge chargés avec succès');

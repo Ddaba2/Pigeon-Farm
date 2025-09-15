@@ -10,7 +10,7 @@ export const getCookie = (name: string): string | null => {
     }
     return null;
   } catch (error) {
-    console.warn('Erreur lors de la lecture du cookie:', error);
+    // console.warn('Erreur lors de la lecture du cookie:', error);
     return null;
   }
 };
@@ -30,12 +30,12 @@ export const setCookie = (name: string, value: string, days: number = 1): void =
     if (!document.cookie.includes(`${name}=${value}`)) {
       // Fallback sans SameSite pour Edge Legacy
       document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
-      console.log(`🍪 Cookie ${name} défini avec fallback Edge`);
+      // console.log(`🍪 Cookie ${name} défini avec fallback Edge`);
     } else {
-      console.log(`🍪 Cookie ${name} défini avec SameSite=Lax`);
+      // console.log(`🍪 Cookie ${name} défini avec SameSite=Lax`);
     }
   } catch (error) {
-    console.warn('Erreur lors de l\'écriture du cookie:', error);
+    // console.warn('Erreur lors de l\'écriture du cookie:', error);
   }
 };
 
@@ -43,7 +43,7 @@ export const removeCookie = (name: string): void => {
   try {
     document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
   } catch (error) {
-    console.warn('Erreur lors de la suppression du cookie:', error);
+    // console.warn('Erreur lors de la suppression du cookie:', error);
   }
 };
 

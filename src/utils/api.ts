@@ -24,20 +24,11 @@ class ApiService {
       try {
         finalSessionId = edgeLocalStorage.getItem('sessionId');
       } catch (error) {
-        console.warn('Erreur localStorage:', error);
+        // Erreur localStorage ignorée
       }
     }
     
-    // Debug pour Edge
-    console.log(`🔍 Debug API ${endpoint}:`, {
-      sessionId: finalSessionId ? 'Présent' : 'Manquant',
-      sessionIdValue: finalSessionId,
-      cookies: document.cookie ? 'Présents' : 'Manquants',
-      cookiesValue: document.cookie,
-      url,
-      userAgent: navigator.userAgent,
-      isEdge: /Edg/.test(navigator.userAgent)
-    });
+    // Debug API désactivé
     
     // Configuration par défaut pour l'authentification par session
     const defaultOptions: RequestInit = {
@@ -72,7 +63,7 @@ class ApiService {
 
       return await response.json();
     } catch (error) {
-      console.error(`Erreur API ${endpoint}:`, error);
+      // Erreur API gérée silencieusement
       throw error;
     }
   }
@@ -168,23 +159,23 @@ class ApiService {
         }
         if (data.sessionId) {
           setSessionId(data.sessionId);
-          console.log('✅ SessionId stocké:', data.sessionId);
+          // SessionId stocké
           
           // Stocker aussi dans localStorage comme fallback
           if (isLocalStorageAvailable()) {
             try {
               edgeLocalStorage.setItem('sessionId', data.sessionId);
-              console.log('💾 SessionId stocké dans localStorage');
+              // SessionId stocké dans localStorage
             } catch (error) {
-              console.warn('Erreur localStorage:', error);
+              // Erreur localStorage ignorée
             }
           }
         }
         
         // Debug des cookies après connexion
-        console.log('🍪 Cookies après connexion:', document.cookie);
+        // Cookies gérés silencieusement
       } catch (error) {
-        console.warn('Erreur lors du stockage:', error);
+        // Erreur stockage ignorée
         // Continuer sans stockage local
       }
     }
@@ -209,7 +200,7 @@ class ApiService {
         }
         removeSessionId();
       } catch (error) {
-        console.warn('Erreur lors du nettoyage:', error);
+        // Erreur nettoyage ignorée
         // Continuer sans nettoyage
       }
     }
@@ -457,4 +448,63 @@ export const validatePhone = (phone: string): string | null => {
     return 'Format de téléphone invalide';
   }
   return null;
+};
+
+// ========== MÉTHODES D'ADMINISTRATION ==========
+
+// Récupérer les statistiques d'administration
+export const getAdminStats = async () => {
+  return apiService.get('/admin/stats');
+};
+
+// Récupérer tous les utilisateurs pour l'admin
+export const getAllUsersForAdmin = async () => {
+  return apiService.get('/admin/users');
+};
+
+// Récupérer les utilisateurs récents
+export const getRecentUsers = async (limit = 10) => {
+  return apiService.get(`/admin/users/recent?limit=${limit}`);
+};
+
+// Bloquer un utilisateur
+export const blockUser = async (userId: number) => {
+  return apiService.put(`/admin/users/${userId}/block`, {});
+};
+
+// Débloquer un utilisateur
+export const unblockUser = async (userId: number) => {
+  return apiService.put(`/admin/users/${userId}/unblock`, {});
+};
+
+// Supprimer un utilisateur
+export const deleteUserAdmin = async (userId: number) => {
+  return apiService.delete(`/admin/users/${userId}`);
+};
+
+// ========== MÉTHODES DE PROFIL UTILISATEUR ==========
+
+// Récupérer le profil de l'utilisateur connecté
+export const getUserProfile = async () => {
+  return apiService.get('/users/profile/me');
+};
+
+// Mettre à jour le profil utilisateur
+export const updateUserProfile = async (profileData: any) => {
+  return apiService.put('/users/profile/me', profileData);
+};
+
+// Changer le mot de passe
+export const changeUserPassword = async (passwordData: any) => {
+  return apiService.put('/users/profile/me/password', passwordData);
+};
+
+// Mettre à jour l'avatar
+export const updateUserAvatar = async (avatarUrl: string) => {
+  return apiService.put('/users/profile/me/avatar', { avatarUrl });
+};
+
+// Supprimer le compte utilisateur
+export const deleteUserAccount = async (password: string, confirmDelete: string) => {
+  return apiService.delete('/users/profile/me', { password, confirmDelete });
 };

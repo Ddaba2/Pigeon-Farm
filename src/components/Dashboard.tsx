@@ -50,7 +50,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           });
         }
     } catch (error) {
-        console.error('Erreur lors du chargement des données du tableau de bord:', error);
+        // Erreur chargement tableau de bord ignorée
       }
     };
 

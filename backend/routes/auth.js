@@ -115,6 +115,29 @@ router.post('/login', asyncHandler(async (req, res) => {
       });
     }
     
+    // Vérifier le statut de l'utilisateur
+    if (user.status === 'blocked') {
+      console.log('🚫 Blocked user attempted login:', user.username);
+      return res.status(403).json({
+        success: false,
+        error: {
+          message: 'Votre compte a été bloqué. Contactez un administrateur.',
+          code: 'ACCOUNT_BLOCKED'
+        }
+      });
+    }
+    
+    if (user.status === 'pending') {
+      console.log('⏳ Pending user attempted login:', user.username);
+      return res.status(403).json({
+        success: false,
+        error: {
+          message: 'Votre compte est en attente d\'approbation.',
+          code: 'ACCOUNT_PENDING'
+        }
+      });
+    }
+    
     // Créer une session
     const sessionId = createSession(user);
     
@@ -215,6 +238,27 @@ router.post('/verify', asyncHandler(async (req, res) => {
       error: {
         message: 'Mot de passe incorrect',
         code: 'INVALID_PASSWORD'
+      }
+    });
+  }
+  
+  // Vérifier le statut de l'utilisateur
+  if (user.status === 'blocked') {
+    return res.status(403).json({
+      success: false,
+      error: {
+        message: 'Votre compte a été bloqué. Contactez un administrateur.',
+        code: 'ACCOUNT_BLOCKED'
+      }
+    });
+  }
+  
+  if (user.status === 'pending') {
+    return res.status(403).json({
+      success: false,
+      error: {
+        message: 'Votre compte est en attente d\'approbation.',
+        code: 'ACCOUNT_PENDING'
       }
     });
   }

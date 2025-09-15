@@ -26,7 +26,7 @@ const CouplesManagement: React.FC = () => {
           setCouples(response.data);
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des couples:', error);
+        // console.error('Erreur lors du chargement des couples:', error);
       }
     };
 
@@ -89,7 +89,7 @@ const CouplesManagement: React.FC = () => {
       setEditingCouple(null);
       resetForm();
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
+      // console.error('Erreur lors de la sauvegarde:', error);
       alert('Erreur lors de la sauvegarde du couple');
     }
   };
@@ -128,7 +128,7 @@ const CouplesManagement: React.FC = () => {
           setCouples(couples.filter(c => c.id !== confirmationModal.coupleId));
         }
       } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
+        // console.error('Erreur lors de la suppression:', error);
         alert('Erreur lors de la suppression du couple');
       }
     }

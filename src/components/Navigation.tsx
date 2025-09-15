@@ -13,7 +13,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, userRo
   const { preferences } = useAccessibility();
   
   const tabs = [
-    { id: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
+    // Les admins n'ont pas accès au tableau de bord normal, ils utilisent l'interface admin
+    ...(userRole !== 'admin' ? [{ id: 'dashboard', label: 'Tableau de bord', icon: BarChart3 }] : []),
     { id: 'couples', label: 'Couples', icon: Users },
     { id: 'eggs', label: 'Œufs', icon: FileText },
     { id: 'pigeonneaux', label: 'Pigeonneaux', icon: Activity },

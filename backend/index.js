@@ -16,12 +16,18 @@ const { testDatabaseConnection } = require('./config/database.js');
 const authRouter = require('./routes/auth.js');
 const passwordResetRouter = require('./routes/passwordReset.js');
 const usersRouter = require('./routes/users.js');
+const adminRouter = require('./routes/admin.js');
 const couplesRouter = require('./routes/couples.js');
 const eggsRouter = require('./routes/eggs.js');
 const pigeonneauxRouter = require('./routes/pigeonneaux.js');
 const healthRouter = require('./routes/health.js');
 const statisticsRouter = require('./routes/statistics.js');
 const salesRouter = require('./routes/sales.js');
+const adminTrendsRouter = require('./routes/adminTrends.js');
+const adminProfilesRouter = require('./routes/adminProfiles.js');
+const adminDashboardRouter = require('./routes/adminDashboard.js');
+const adminMetricsRouter = require('./routes/adminMetrics.js');
+const adminBackupRouter = require('./routes/adminBackup.js');
 
 const app = express();
 const port = config.port;
@@ -150,6 +156,7 @@ app.get('/api/test', (req, res) => {
 // Configuration des routes API
 app.use('/api/auth', authRateLimiter, authRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api', passwordResetRouter);
 app.use('/api/couples', couplesRouter);
 app.use('/api/eggs', eggsRouter);
@@ -157,6 +164,11 @@ app.use('/api/pigeonneaux', pigeonneauxRouter);
 app.use('/api/health-records', healthRouter);
 app.use('/api/statistics', statisticsRouter);
 app.use('/api/sales', salesRouter);
+app.use('/api/admin/trends', adminTrendsRouter);
+app.use('/api/admin/profiles', adminProfilesRouter);
+app.use('/api/admin/dashboard', adminDashboardRouter);
+app.use('/api/admin', adminMetricsRouter);
+app.use('/api/admin/backup', adminBackupRouter);
 
 // Gestionnaire d'erreurs 404
 app.use(notFoundHandler);
