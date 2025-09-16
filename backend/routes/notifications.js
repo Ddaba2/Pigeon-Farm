@@ -176,6 +176,28 @@ router.post('/', authenticateUser, asyncHandler(async (req, res) => {
   }
 }));
 
+// DELETE /api/notifications/read - Supprimer toutes les notifications lues
+router.delete('/read', authenticateUser, asyncHandler(async (req, res) => {
+  try {
+    const count = await NotificationService.deleteReadNotifications(req.user.id);
+    
+    res.json({
+      success: true,
+      message: `${count} notifications lues supprimées`,
+      data: { count }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la suppression des notifications lues:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la suppression des notifications lues',
+        code: 'NOTIFICATIONS_DELETE_READ_ERROR'
+      }
+    });
+  }
+}));
+
 // DELETE /api/notifications/:id - Supprimer une notification
 router.delete('/:id', authenticateUser, asyncHandler(async (req, res) => {
   try {
@@ -203,28 +225,6 @@ router.delete('/:id', authenticateUser, asyncHandler(async (req, res) => {
       error: {
         message: 'Erreur lors de la suppression de la notification',
         code: 'NOTIFICATION_DELETE_ERROR'
-      }
-    });
-  }
-}));
-
-// DELETE /api/notifications/read - Supprimer toutes les notifications lues
-router.delete('/read', authenticateUser, asyncHandler(async (req, res) => {
-  try {
-    const count = await NotificationService.deleteReadNotifications(req.user.id);
-    
-    res.json({
-      success: true,
-      message: `${count} notifications lues supprimées`,
-      data: { count }
-    });
-  } catch (error) {
-    console.error('Erreur lors de la suppression des notifications lues:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Erreur lors de la suppression des notifications lues',
-        code: 'NOTIFICATIONS_DELETE_READ_ERROR'
       }
     });
   }

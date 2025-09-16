@@ -7,25 +7,22 @@ import {
   Shield,
   Menu,
   X,
-  AlertTriangle
 } from 'lucide-react';
 import AdminDashboard from './AdminDashboard';
 import AdminUserManagement from './AdminUserManagement';
 import AdminMonitoring from './AdminMonitoring';
-import AdminBackup from './AdminBackup';
 import AdminTrends from './AdminTrends';
 import AdminUserProfiles from './AdminUserProfiles';
 import AdminCustomDashboard from './AdminCustomDashboard';
 import ErrorBoundary from './ErrorBoundary';
 
-type AdminTab = 'dashboard' | 'users' | 'monitoring' | 'backup' | 'settings' | 'trends' | 'profiles' | 'custom-dashboard';
+type AdminTab = 'dashboard' | 'users' | 'monitoring' | 'settings' | 'trends' | 'profiles' | 'custom-dashboard';
 
 interface AdminPanelProps {
   onClose?: () => void;
-  onOpenDebug?: () => void;
 }
 
-function AdminPanel({ onClose, onOpenDebug }: AdminPanelProps) {
+function AdminPanel({ onClose }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -36,7 +33,6 @@ function AdminPanel({ onClose, onOpenDebug }: AdminPanelProps) {
     { id: 'profiles' as AdminTab, name: 'Profils Détaillés', icon: Users },
     { id: 'custom-dashboard' as AdminTab, name: 'Tableau Personnalisé', icon: LayoutDashboard },
     { id: 'monitoring' as AdminTab, name: 'Monitoring Système', icon: BarChart3 },
-    { id: 'backup' as AdminTab, name: 'Sauvegarde & Restauration', icon: Settings },
     { id: 'settings' as AdminTab, name: 'Paramètres', icon: Settings },
   ];
 
@@ -54,8 +50,6 @@ function AdminPanel({ onClose, onOpenDebug }: AdminPanelProps) {
         return <AdminCustomDashboard />;
       case 'monitoring':
         return <AdminMonitoring />;
-      case 'backup':
-        return <AdminBackup />;
       case 'settings':
         return (
           <div className="space-y-6">
@@ -117,7 +111,11 @@ function AdminPanel({ onClose, onOpenDebug }: AdminPanelProps) {
       {/* Header mobile */}
       <div className="lg:hidden bg-white shadow-sm border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Shield className="h-6 w-6 text-blue-600" />
+          <img
+            className="h-8 w-auto"
+            src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png"
+            alt="Logo PigeonFarm"
+          />
           <h1 className="text-lg font-semibold text-gray-900">Administration</h1>
         </div>
         <button
@@ -135,7 +133,11 @@ function AdminPanel({ onClose, onOpenDebug }: AdminPanelProps) {
         } fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col`}>
           <div className="flex items-center justify-center h-16 px-4 bg-blue-600 flex-shrink-0">
             <div className="flex items-center space-x-2">
-              <Shield className="h-8 w-8 text-white" />
+              <img
+                className="h-8 w-auto"
+                src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png"
+                alt="Logo PigeonFarm"
+              />
               <span className="text-white font-bold text-lg">PigeonFarm</span>
             </div>
           </div>
@@ -160,36 +162,6 @@ function AdminPanel({ onClose, onOpenDebug }: AdminPanelProps) {
                 </div>
               </div>
 
-              {/* Bouton Déboguer */}
-              <button
-                onClick={() => {
-                  if (onOpenDebug) {
-                    onOpenDebug();
-                  }
-                }}
-                className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-600 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors border border-yellow-200"
-              >
-                <AlertTriangle className="mr-3 h-5 w-5 text-yellow-600" />
-                Déboguer
-              </button>
-
-              {/* Informations Système */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="space-y-2 text-xs text-gray-600">
-                  <div className="flex items-center justify-between">
-                    <span>Version:</span>
-                    <span className="font-medium">1.0.0</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Mode:</span>
-                    <span className="font-medium text-blue-600">Admin</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Base:</span>
-                    <span className="font-medium text-green-600">Connectée</span>
-                  </div>
-                </div>
-              </div>
 
               {/* Navigation simplifiée */}
               <div className="space-y-2">
@@ -234,20 +206,6 @@ function AdminPanel({ onClose, onOpenDebug }: AdminPanelProps) {
                 >
                   <BarChart3 className="mr-3 h-5 w-5" />
                   Surveillance Système
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab('backup');
-                    setSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    activeTab === 'backup'
-                      ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <Settings className="mr-3 h-5 w-5" />
-                  Sauvegarde & Restauration
                 </button>
                 <button
                   onClick={() => {
@@ -305,7 +263,6 @@ function AdminPanel({ onClose, onOpenDebug }: AdminPanelProps) {
                   {activeTab === 'profiles' && 'Profils détaillés des utilisateurs'}
                   {activeTab === 'custom-dashboard' && 'Tableau de bord personnalisable'}
                   {activeTab === 'monitoring' && 'Surveillez les performances'}
-                  {activeTab === 'backup' && 'Gérez les sauvegardes'}
                   {activeTab === 'settings' && 'Configuration système'}
                 </p>
               </div>

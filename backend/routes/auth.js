@@ -9,9 +9,12 @@ const { testDatabaseConnection } = require('../config/database.js');
 const { validateUser } = require('../utils/validation.js');
 const { asyncHandler } = require('../utils/errorHandler.js');
 const UserService = require('../services/userService.js');
+const EmailService = require('../services/emailService.js');
+const NotificationService = require('../services/notificationService.js');
 
 
 const router = express.Router();
+const emailService = new EmailService();
 
 // Service d'authentification - Base de données MySQL uniquement
 
@@ -60,6 +63,24 @@ router.post('/register', asyncHandler(async (req, res) => {
     fullName: fullName || '',
     role: 'user'
   });
+
+  // Envoyer email de bienvenue
+  try {
+    await emailService.sendWelcomeEmail(newUser);
+    
+    // Créer une notification de bienvenue dans la base de données
+    await NotificationService.createNotification(
+      newUser.id,
+      '🐦 Bienvenue sur PigeonFarm !',
+      'Votre compte a été créé avec succès. Explorez toutes les fonctionnalités disponibles !',
+      'info'
+    );
+    
+    console.log(`📧 Email de bienvenue envoyé à ${newUser.email}`);
+  } catch (emailError) {
+    console.error('Erreur lors de l\'envoi de l\'email de bienvenue:', emailError);
+    // Ne pas faire échouer l'inscription si l'email échoue
+  }
   
   res.status(201).json({
     success: true,

@@ -60,13 +60,21 @@ const executeQuery = async (sql, params = []) => {
 };
 
 // Fonction pour exécuter des requêtes avec transaction
-const executeTransaction = async (queries) => {
+const executeTransaction = async (queriesOrCallback) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     
+    // Si c'est une fonction callback (nouveau format)
+    if (typeof queriesOrCallback === 'function') {
+      const result = await queriesOrCallback(connection);
+      await connection.commit();
+      return result;
+    }
+    
+    // Si c'est un tableau de requêtes (ancien format)
     const results = [];
-    for (const query of queries) {
+    for (const query of queriesOrCallback) {
       const [result] = await connection.execute(query.sql, query.params || []);
       results.push(result);
     }

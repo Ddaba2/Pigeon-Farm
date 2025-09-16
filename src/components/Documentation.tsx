@@ -332,10 +332,6 @@ const Documentation: React.FC = () => {
 
       {/* Section FAQ */}
       <div className="space-y-6">
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-2xl p-6 border border-yellow-200 dark:border-yellow-800 mb-6">
-          <h2 className="text-xl font-bold mb-2 text-yellow-800 dark:text-yellow-200 flex items-center gap-2"><AlertCircle className="h-5 w-5" /> Sauvegarde et restauration</h2>
-          <p className="text-gray-700 dark:text-gray-200 mb-2">Utilisez la section "Sauvegarde" pour sauvegarder vos données et les restaurer en cas de problème.</p>
-        </div>
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center space-x-3">
             <MessageCircle className="h-6 w-6 text-gray-600 dark:text-gray-400" />

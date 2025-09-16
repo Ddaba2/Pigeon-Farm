@@ -267,15 +267,32 @@ class UserService {
     try {
       // Utiliser une transaction pour supprimer toutes les données liées
       return await executeTransaction(async (connection) => {
-        // Supprimer les données liées (couples, œufs, pigeonneaux, etc.)
-        await connection.execute('DELETE FROM couples WHERE user_id = ?', [userId]);
-        await connection.execute('DELETE FROM eggs WHERE user_id = ?', [userId]);
-        await connection.execute('DELETE FROM pigeonneaux WHERE user_id = ?', [userId]);
-        await connection.execute('DELETE FROM health_records WHERE user_id = ?', [userId]);
-        await connection.execute('DELETE FROM sales WHERE user_id = ?', [userId]);
-        await connection.execute('DELETE FROM action_logs WHERE user_id = ?', [userId]);
+        // 1. Récupérer les IDs des couples de l'utilisateur
+        const [couples] = await connection.execute('SELECT id FROM couples WHERE user_id = ?', [userId]);
+        const coupleIds = couples.map(couple => couple.id);
         
-        // Supprimer l'utilisateur
+        // 2. Supprimer les pigeonneaux liés aux couples de l'utilisateur
+        if (coupleIds.length > 0) {
+          const placeholders = coupleIds.map(() => '?').join(',');
+          await connection.execute(`DELETE FROM pigeonneaux WHERE coupleId IN (${placeholders})`, coupleIds);
+        }
+        
+        // 3. Supprimer les œufs liés aux couples de l'utilisateur
+        if (coupleIds.length > 0) {
+          const placeholders = coupleIds.map(() => '?').join(',');
+          await connection.execute(`DELETE FROM eggs WHERE coupleId IN (${placeholders})`, coupleIds);
+        }
+        
+        // 4. Supprimer les couples de l'utilisateur
+        await connection.execute('DELETE FROM couples WHERE user_id = ?', [userId]);
+        
+        // 5. Supprimer les ventes de l'utilisateur
+        await connection.execute('DELETE FROM sales WHERE user_id = ?', [userId]);
+        
+        // 6. Supprimer les notifications de l'utilisateur
+        await connection.execute('DELETE FROM notifications WHERE user_id = ?', [userId]);
+        
+        // 7. Supprimer l'utilisateur
         await connection.execute('DELETE FROM users WHERE id = ?', [userId]);
         
         return true;

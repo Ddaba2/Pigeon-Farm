@@ -1,9 +1,221 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { sendPasswordResetEmail, sendPasswordResetConfirmation } = require('../services/emailService.js');
+const EmailService = require('../services/emailService.js');
 const { executeQuery } = require('../config/database.js');
 
 const router = express.Router();
+const emailService = new EmailService();
+
+// Fonction pour envoyer l'email de réinitialisation
+async function sendPasswordResetEmail(email, code) {
+    try {
+        const subject = '🔑 Code de réinitialisation PigeonFarm';
+        const text = `
+Bonjour,
+
+Vous avez demandé la réinitialisation de votre mot de passe pour votre compte PigeonFarm.
+
+Votre code de réinitialisation est : ${code}
+
+⚠️ Important :
+- Ce code expire dans 15 minutes
+- Ne partagez jamais ce code avec personne
+- Si vous n'avez pas demandé cette réinitialisation, ignorez cet email
+
+Instructions :
+1. Copiez le code ci-dessus
+2. Retournez sur la page de réinitialisation
+3. Entrez le code dans le champ approprié
+4. Créez votre nouveau mot de passe
+
+Si vous avez des questions ou besoin d'aide, contactez notre équipe de support.
+
+Cordialement,
+L'équipe PigeonFarm
+
+---
+Cet email a été envoyé automatiquement suite à votre demande de réinitialisation.
+Si vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email.
+        `;
+
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Réinitialisation de mot de passe - PigeonFarm</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { padding: 30px; background-color: #f8f9fa; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #e9ecef; border-radius: 0 0 10px 10px; }
+        .code { display: inline-block; padding: 15px 30px; background-color: #f8f9fa; border: 2px solid #667eea; border-radius: 8px; font-size: 24px; font-weight: bold; color: #667eea; margin: 20px 0; }
+        .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔑 Réinitialisation de mot de passe</h1>
+            <p>Code de sécurité</p>
+        </div>
+        <div class="content">
+            <h2>Bonjour,</h2>
+            <p>Vous avez demandé la réinitialisation de votre mot de passe pour votre compte PigeonFarm.</p>
+            
+            <p><strong>Votre code de réinitialisation est :</strong></p>
+            <div style="text-align: center;">
+                <div class="code">${code}</div>
+            </div>
+
+            <div class="warning">
+                <h4>⚠️ Important :</h4>
+                <ul>
+                    <li>Ce code expire dans <strong>15 minutes</strong></li>
+                    <li>Ne partagez jamais ce code avec personne</li>
+                    <li>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email</li>
+                </ul>
+            </div>
+
+            <h3>📋 Instructions :</h3>
+            <ol>
+                <li>Copiez le code ci-dessus</li>
+                <li>Retournez sur la page de réinitialisation</li>
+                <li>Entrez le code dans le champ approprié</li>
+                <li>Créez votre nouveau mot de passe</li>
+            </ol>
+            
+            <p>Si vous avez des questions ou besoin d'aide, contactez notre équipe de support.</p>
+            
+            <p>Cordialement,<br><strong>L'équipe PigeonFarm</strong></p>
+        </div>
+        <div class="footer">
+            <p>Cet email a été envoyé automatiquement suite à votre demande de réinitialisation.</p>
+            <p>Si vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+
+        await emailService.sendEmail(email, subject, text, html);
+        console.log(`📧 Email de réinitialisation envoyé à ${email}`);
+        return true;
+    } catch (error) {
+        console.error('Erreur lors de l\'envoi de l\'email de réinitialisation:', error);
+        return false;
+    }
+}
+
+// Fonction pour envoyer l'email de confirmation
+async function sendPasswordResetConfirmation(email) {
+    try {
+        const subject = '✅ Mot de passe réinitialisé - PigeonFarm';
+        const text = `
+Bonjour,
+
+Nous vous confirmons que votre mot de passe PigeonFarm a été réinitialisé avec succès.
+
+✅ Réinitialisation confirmée
+Votre nouveau mot de passe est maintenant actif et vous pouvez vous connecter à votre compte.
+
+🔒 Détails de sécurité :
+- Email : ${email}
+- Date : ${new Date().toLocaleDateString('fr-FR')}
+- Heure : ${new Date().toLocaleTimeString('fr-FR')}
+- Statut : Mot de passe réinitialisé
+
+🛡️ Conseils de sécurité :
+- Utilisez un mot de passe fort et unique
+- Ne partagez jamais vos identifiants
+- Déconnectez-vous après chaque session
+- Signalez toute activité suspecte
+
+Se connecter maintenant : ${process.env.FRONTEND_URL || 'http://localhost:5173'}/login
+
+Si vous n'avez pas effectué cette réinitialisation, contactez immédiatement notre équipe de support.
+
+Cordialement,
+L'équipe PigeonFarm
+
+---
+Cet email a été envoyé automatiquement suite à la réinitialisation de votre mot de passe.
+Si vous n'avez pas effectué cette réinitialisation, contactez immédiatement notre support.
+        `;
+
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Mot de passe réinitialisé - PigeonFarm</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { padding: 30px; background-color: #f8f9fa; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #e9ecef; border-radius: 0 0 10px 10px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .button { display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 25px; margin: 20px 0; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Mot de passe réinitialisé</h1>
+            <p>Confirmation de sécurité</p>
+        </div>
+        <div class="content">
+            <h2>Bonjour,</h2>
+            <p>Nous vous confirmons que votre mot de passe PigeonFarm a été réinitialisé avec succès.</p>
+            
+            <div class="success">
+                <h4>✅ Réinitialisation confirmée</h4>
+                <p>Votre nouveau mot de passe est maintenant actif et vous pouvez vous connecter à votre compte.</p>
+            </div>
+
+            <h3>🔒 Détails de sécurité :</h3>
+            <ul>
+                <li><strong>Email :</strong> ${email}</li>
+                <li><strong>Date :</strong> ${new Date().toLocaleDateString('fr-FR')}</li>
+                <li><strong>Heure :</strong> ${new Date().toLocaleTimeString('fr-FR')}</li>
+                <li><strong>Statut :</strong> Mot de passe réinitialisé</li>
+            </ul>
+
+            <h3>🛡️ Conseils de sécurité :</h3>
+            <ul>
+                <li>Utilisez un mot de passe fort et unique</li>
+                <li>Ne partagez jamais vos identifiants</li>
+                <li>Déconnectez-vous après chaque session</li>
+                <li>Signalez toute activité suspecte</li>
+            </ul>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" class="button">Se connecter maintenant</a>
+            </div>
+
+            <p>Si vous n'avez pas effectué cette réinitialisation, contactez immédiatement notre équipe de support.</p>
+            
+            <p>Cordialement,<br><strong>L'équipe PigeonFarm</strong></p>
+        </div>
+        <div class="footer">
+            <p>Cet email a été envoyé automatiquement suite à la réinitialisation de votre mot de passe.</p>
+            <p>Si vous n'avez pas effectué cette réinitialisation, contactez immédiatement notre support.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+
+        await emailService.sendEmail(email, subject, text, html);
+        console.log(`📧 Email de confirmation de réinitialisation envoyé à ${email}`);
+        return true;
+    } catch (error) {
+        console.error('Erreur lors de l\'envoi de l\'email de confirmation:', error);
+        return false;
+    }
+}
 
 /**
  * POST /api/forgot-password

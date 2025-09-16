@@ -12,7 +12,6 @@ import UsersManagement from './components/UsersManagement';
 import Documentation from './components/Documentation';
 import Profile from './components/Profile';
 import AdminPanel from './components/AdminPanel';
-import AdminDebug from './components/AdminDebug';
 import Notifications from './components/Notifications';
 import ErrorBoundary from './components/ErrorBoundary';
 import { User } from './types/types';
@@ -25,7 +24,6 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [showAdminDebug, setShowAdminDebug] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const { isDark, toggleDark } = useDarkMode();
@@ -88,7 +86,6 @@ function App() {
     setUser(null);
     setActiveTab('dashboard');
     setShowAdminPanel(false);
-    setShowAdminDebug(false);
   };
 
   if (!user) {
@@ -158,17 +155,6 @@ function App() {
                   </button>
                 )}
 
-                {/* Admin Debug Button - visible pour tous les utilisateurs admin */}
-                {user.role === 'admin' && (
-                  <button
-                    onClick={() => setShowAdminDebug(true)}
-                    className="flex items-center space-x-2 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-yellow-600 dark:hover:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors"
-                    title="Diagnostic Admin"
-                  >
-                    <AlertTriangle className="h-4 w-4" />
-                    <span className="text-sm font-medium">Debug</span>
-                  </button>
-                )}
 
                 {/* Notifications Button */}
                 <button
@@ -237,7 +223,7 @@ function App() {
         </header>
 
         {/* Main Content - Masqué quand l'admin panel est ouvert ou pour les admins */}
-        {!showAdminPanel && !showAdminDebug && user.role !== 'admin' && (
+        {!showAdminPanel && user.role !== 'admin' && (
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {/* Success Message */}
             {successMessage && (
@@ -266,17 +252,10 @@ function App() {
           <div className="fixed inset-0 z-50">
             <AdminPanel 
               onClose={() => setShowAdminPanel(false)} 
-              onOpenDebug={() => setShowAdminDebug(true)}
             />
           </div>
         )}
 
-        {/* Admin Debug Modal */}
-        {showAdminDebug && (
-          <div className="fixed inset-0 z-50">
-            <AdminDebug onClose={() => setShowAdminDebug(false)} />
-          </div>
-        )}
 
         {/* Notifications Modal */}
         {showNotifications && (

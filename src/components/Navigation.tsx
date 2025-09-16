@@ -20,7 +20,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, userRo
     { id: 'pigeonneaux', label: 'Pigeonneaux', icon: Activity },
     { id: 'health', label: 'Santé', icon: Heart },
     { id: 'statistics', label: 'Statistiques', icon: TrendingUp },
-    ...(userRole === 'admin' ? [{ id: 'backup', label: 'Sauvegarde', icon: FileTextIcon }] : []),
     { id: 'help', label: 'Aide', icon: Settings },
   ];
   

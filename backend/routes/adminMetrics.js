@@ -4,7 +4,7 @@ const { authenticateUser, requireAdmin } = require('../middleware/auth.js');
 const { asyncHandler } = require('../utils/errorHandler.js');
 
 // Route pour obtenir les métriques système
-router.get('/metrics', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
+router.get('/', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const db = require('../config/database');
     

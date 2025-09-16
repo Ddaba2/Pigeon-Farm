@@ -2,8 +2,11 @@ const express = require('express');
 const { authenticateUser, requireAdmin } = require('../middleware/auth.js');
 const { asyncHandler } = require('../utils/errorHandler.js');
 const UserService = require('../services/userService.js');
+const EmailService = require('../services/emailService.js');
+const NotificationService = require('../services/notificationService.js');
 
 const router = express.Router();
+const emailService = new EmailService();
 
 // ========== ROUTES D'ADMINISTRATION ==========
 
@@ -109,6 +112,24 @@ router.put('/users/:id/block', authenticateUser, requireAdmin, asyncHandler(asyn
       });
     }
 
+    // Envoyer notification par email
+    try {
+      await emailService.sendAccountBlockedNotification(updatedUser);
+      
+      // Créer une notification dans la base de données
+      await NotificationService.createNotification(
+        userId,
+        '🚫 Compte bloqué',
+        'Votre compte a été bloqué par un administrateur. Contactez l\'équipe pour plus d\'informations.',
+        'warning'
+      );
+      
+      console.log(`📧 Notification de blocage envoyée à ${updatedUser.email}`);
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de la notification par email:', emailError);
+      // Ne pas faire échouer la requête si l'email échoue
+    }
+
     res.json({
       success: true,
       data: updatedUser,
@@ -151,6 +172,24 @@ router.put('/users/:id/unblock', authenticateUser, requireAdmin, asyncHandler(as
           code: 'USER_NOT_FOUND'
         }
       });
+    }
+
+    // Envoyer notification par email
+    try {
+      await emailService.sendAccountUnblockedNotification(updatedUser);
+      
+      // Créer une notification dans la base de données
+      await NotificationService.createNotification(
+        userId,
+        '✅ Compte débloqué',
+        'Votre compte a été débloqué par un administrateur. Vous pouvez maintenant vous connecter normalement.',
+        'success'
+      );
+      
+      console.log(`📧 Notification de déblocage envoyée à ${updatedUser.email}`);
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de la notification par email:', emailError);
+      // Ne pas faire échouer la requête si l'email échoue
     }
 
     res.json({
@@ -208,6 +247,16 @@ router.delete('/users/:id', authenticateUser, requireAdmin, asyncHandler(async (
       });
     }
 
+    // Envoyer notification par email AVANT la suppression
+    try {
+      await emailService.sendAccountDeletedNotification(user);
+      console.log(`📧 Notification de suppression envoyée à ${user.email}`);
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de la notification par email:', emailError);
+      // Ne pas faire échouer la requête si l'email échoue
+    }
+
+    // Supprimer l'utilisateur (les notifications seront supprimées automatiquement)
     await UserService.deleteUserAdmin(userId);
 
     res.json({

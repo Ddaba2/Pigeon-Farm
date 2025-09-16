@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types/types';
 import apiService from '../utils/api';
+import ForgotPassword from './ForgotPassword';
 
 interface LoginProps {
   onAuthSuccess: (user: User, msg?: string) => void;
@@ -8,6 +9,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -25,6 +27,23 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
     setLoading(true);
 
     try {
+      // Validations côté client
+      if (!formData.username.trim()) {
+        throw new Error('Le nom d\'utilisateur est requis');
+      }
+
+      if (!formData.password.trim()) {
+        throw new Error('Le mot de passe est requis');
+      }
+
+      if (formData.username.length < 3) {
+        throw new Error('Le nom d\'utilisateur doit contenir au moins 3 caractères');
+      }
+
+      if (formData.password.length < 6) {
+        throw new Error('Le mot de passe doit contenir au moins 6 caractères');
+      }
+
       if (isLogin) {
         const response = await apiService.login({
           username: formData.username,
@@ -35,7 +54,15 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
           onAuthSuccess(response.user, 'Connexion réussie !');
         }
       } else {
-        // Validation pour l'inscription
+        // Validations supplémentaires pour l'inscription
+        if (!formData.email.trim()) {
+          throw new Error('L\'adresse email est requise');
+        }
+
+        if (!formData.email.includes('@')) {
+          throw new Error('Veuillez saisir une adresse email valide');
+        }
+
         if (formData.password !== formData.confirmPassword) {
           throw new Error('Les mots de passe ne correspondent pas');
         }
@@ -48,7 +75,7 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
           username: formData.username,
           email: formData.email,
           password: formData.password,
-          fullName: formData.fullName || formData.username, // Utiliser username si fullName vide
+          fullName: formData.fullName || formData.username,
           acceptTerms: formData.acceptTerms
         });
 
@@ -57,7 +84,22 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
         }
       }
     } catch (error: any) {
-      setError(error.message || 'Une erreur s\'est produite');
+      // Messages d'erreur plus spécifiques
+      let errorMessage = error.message || 'Une erreur s\'est produite';
+      
+      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        errorMessage = 'Identifiants incorrects. Vérifiez votre nom d\'utilisateur et votre mot de passe.';
+      } else if (error.message.includes('404') || error.message.includes('Not Found')) {
+        errorMessage = 'Utilisateur non trouvé. Vérifiez votre nom d\'utilisateur.';
+      } else if (error.message.includes('409') || error.message.includes('Conflict')) {
+        errorMessage = 'Ce nom d\'utilisateur ou cette adresse email est déjà utilisé.';
+      } else if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
+        errorMessage = 'Erreur du serveur. Veuillez réessayer dans quelques instants.';
+      } else if (error.message.includes('Network') || error.message.includes('fetch')) {
+        errorMessage = 'Problème de connexion. Vérifiez votre connexion internet.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -70,6 +112,11 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
       [name]: type === 'checkbox' ? checked : value
     }));
   };
+
+  // Afficher le composant de réinitialisation de mot de passe
+  if (showForgotPassword) {
+    return <ForgotPassword onBack={() => setShowForgotPassword(false)} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -87,8 +134,36 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    {error.includes('401') || error.includes('Unauthorized') ? 'Identifiants incorrects' :
+                     error.includes('404') || error.includes('Not Found') ? 'Utilisateur non trouvé' :
+                     error.includes('500') || error.includes('Internal Server Error') ? 'Erreur du serveur' :
+                     error.includes('Network') || error.includes('fetch') ? 'Problème de connexion' :
+                     'Nom d\'utilisateur ou mot de passe incorrecte'}
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>
+                      {error.includes('401') || error.includes('Unauthorized') ? 
+                        'Vérifiez votre nom d\'utilisateur et votre mot de passe.' :
+                       error.includes('404') || error.includes('Not Found') ? 
+                        'Aucun compte trouvé avec ces identifiants.' :
+                       error.includes('500') || error.includes('Internal Server Error') ? 
+                        'Le serveur rencontre un problème temporaire. Veuillez réessayer.' :
+                       error.includes('Network') || error.includes('fetch') ? 
+                        'Vérifiez votre connexion internet et réessayez.' :
+                        'Vérifiez votre nom d\'utilisateur et votre mot de passe.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -203,7 +278,19 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
             </button>
           </div>
 
-          <div className="text-center">
+          <div className="text-center space-y-2">
+            {isLogin && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-gray-600 hover:text-gray-500"
+                >
+                  Mot de passe oublié ?
+                </button>
+              </div>
+            )}
+            
             <button
               type="button"
               onClick={() => {
