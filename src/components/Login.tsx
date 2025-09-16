@@ -2,6 +2,71 @@ import React, { useState } from 'react';
 import { User } from '../types/types';
 import apiService from '../utils/api';
 import ForgotPassword from './ForgotPassword';
+import PasswordStrengthMeter from './PasswordStrengthMeter';
+
+// Fonction de validation de la force du mot de passe côté client
+const validatePasswordStrength = (password: string) => {
+  const errors: string[] = [];
+  const requirements = {
+    minLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasNumbers: /\d/.test(password),
+    hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    noCommonPatterns: !isCommonPassword(password)
+  };
+
+  if (!requirements.minLength) {
+    errors.push('Le mot de passe doit contenir au moins 8 caractères');
+  }
+  
+  if (!requirements.hasUppercase) {
+    errors.push('Le mot de passe doit contenir au moins une majuscule');
+  }
+  
+  if (!requirements.hasLowercase) {
+    errors.push('Le mot de passe doit contenir au moins une minuscule');
+  }
+  
+  if (!requirements.hasNumbers) {
+    errors.push('Le mot de passe doit contenir au moins un chiffre');
+  }
+  
+  if (!requirements.hasSpecialChar) {
+    errors.push('Le mot de passe doit contenir au moins un caractère spécial');
+  }
+  
+  if (!requirements.noCommonPatterns) {
+    errors.push('Ce mot de passe est trop commun');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    requirements
+  };
+};
+
+// Fonction pour vérifier les mots de passe communs
+const isCommonPassword = (password: string): boolean => {
+  const commonPasswords = [
+    'password', '123456', '123456789', 'qwerty', 'abc123',
+    'password123', 'admin', 'letmein', 'welcome', 'monkey',
+    '1234567890', 'password1', 'qwerty123', 'dragon', 'master',
+    'hello', 'freedom', 'whatever', 'qazwsx', 'trustno1',
+    '654321', 'jordan23', 'harley', 'shadow', 'superman',
+    'michael', 'football', 'baseball', 'ninja', 'azerty',
+    '123123', 'princess', 'daniel', 'mustang', 'access',
+    'flower', '555555', 'pass', 'ranger', 'hunter', 'buster',
+    'soccer', 'hockey', 'killer', 'george', 'sexy', 'andrew',
+    'charlie', 'asshole', 'fuckyou', 'dallas', 'jessica',
+    'panties', 'pepper', '1234', 'zxcvbn', 'qwertyui',
+    '121212', '000000', 'qweasd', 'jennifer', 'zxcvbnm',
+    'asdfgh', 'qwerty', 'azerty', '123456789', 'password'
+  ];
+  
+  return commonPasswords.includes(password.toLowerCase());
+};
 
 interface LoginProps {
   onAuthSuccess: (user: User, msg?: string) => void;
@@ -40,8 +105,17 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
         throw new Error('Le nom d\'utilisateur doit contenir au moins 3 caractères');
       }
 
-      if (formData.password.length < 6) {
-        throw new Error('Le mot de passe doit contenir au moins 6 caractères');
+      // Validation stricte du mot de passe pour l'inscription
+      if (!isLogin) {
+        const passwordValidation = validatePasswordStrength(formData.password);
+        if (!passwordValidation.isValid) {
+          throw new Error(passwordValidation.errors.join(', '));
+        }
+      } else {
+        // Pour la connexion, validation basique
+        if (formData.password.length < 6) {
+          throw new Error('Le mot de passe doit contenir au moins 6 caractères');
+        }
       }
 
       if (isLogin) {
@@ -229,6 +303,11 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
                 onChange={handleInputChange}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               />
+              {!isLogin && formData.password && (
+                <div className="mt-3">
+                  <PasswordStrengthMeter password={formData.password} />
+                </div>
+              )}
             </div>
 
             {!isLogin && (

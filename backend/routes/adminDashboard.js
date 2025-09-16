@@ -1,14 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
+const { authenticateUser, requireAdmin } = require('../middleware/auth.js');
+const { asyncHandler } = require('../utils/errorHandler.js');
 
 // Route pour sauvegarder la configuration du tableau de bord personnalisé
-router.post('/dashboard/config', async (req, res) => {
+router.post('/dashboard/config', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const { userId, config } = req.body;
 
-    // Dans un vrai système, vous auriez une table dashboard_configs
-    // Pour l'instant, on simule la sauvegarde
+    // Configuration par défaut pour l'admin
     const configData = {
       userId,
       layout: config.layout || 'default',
@@ -16,9 +17,6 @@ router.post('/dashboard/config', async (req, res) => {
       theme: config.theme || 'light',
       updatedAt: new Date().toISOString()
     };
-
-    // Simulation de la sauvegarde
-    console.log('Configuration tableau de bord sauvegardée:', configData);
 
     res.json({
       success: true,
@@ -33,14 +31,14 @@ router.post('/dashboard/config', async (req, res) => {
       message: 'Erreur lors de la sauvegarde de la configuration'
     });
   }
-});
+}));
 
 // Route pour récupérer la configuration du tableau de bord
-router.get('/dashboard/config/:userId', async (req, res) => {
+router.get('/dashboard/config/:userId', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Configuration par défaut
+    // Configuration par défaut pour l'admin
     const defaultConfig = {
       userId: parseInt(userId),
       layout: 'grid',
@@ -58,13 +56,6 @@ router.get('/dashboard/config/:userId', async (req, res) => {
           title: 'Activité Récente',
           position: { x: 3, y: 0, w: 3, h: 2 },
           config: { limit: 10 }
-        },
-        {
-          id: 'user-trends',
-          type: 'chart',
-          title: 'Tendances Utilisateurs',
-          position: { x: 0, y: 2, w: 6, h: 3 },
-          config: { chartType: 'line', period: '7d' }
         }
       ],
       theme: 'light',
@@ -83,10 +74,10 @@ router.get('/dashboard/config/:userId', async (req, res) => {
       message: 'Erreur lors du chargement de la configuration'
     });
   }
-});
+}));
 
 // Route pour obtenir les widgets disponibles
-router.get('/dashboard/widgets', async (req, res) => {
+router.get('/dashboard/widgets', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const availableWidgets = [
       {
@@ -108,46 +99,6 @@ router.get('/dashboard/widgets', async (req, res) => {
         category: 'activity',
         defaultSize: { w: 3, h: 2 },
         configurable: true
-      },
-      {
-        id: 'user-trends',
-        type: 'chart',
-        title: 'Tendances Utilisateurs',
-        description: 'Graphique des tendances d\'inscription et connexion',
-        icon: 'TrendingUp',
-        category: 'analytics',
-        defaultSize: { w: 6, h: 3 },
-        configurable: true
-      },
-      {
-        id: 'system-health',
-        type: 'health',
-        title: 'Santé du Système',
-        description: 'État général du système et des services',
-        icon: 'Heart',
-        category: 'system',
-        defaultSize: { w: 2, h: 2 },
-        configurable: false
-      },
-      {
-        id: 'quick-actions',
-        type: 'actions',
-        title: 'Actions Rapides',
-        description: 'Boutons d\'actions rapides pour l\'admin',
-        icon: 'Zap',
-        category: 'actions',
-        defaultSize: { w: 4, h: 1 },
-        configurable: true
-      },
-      {
-        id: 'alerts',
-        type: 'alerts',
-        title: 'Alertes Système',
-        description: 'Notifications et alertes importantes',
-        icon: 'AlertTriangle',
-        category: 'system',
-        defaultSize: { w: 2, h: 2 },
-        configurable: true
       }
     ];
 
@@ -163,10 +114,10 @@ router.get('/dashboard/widgets', async (req, res) => {
       message: 'Erreur lors du chargement des widgets disponibles'
     });
   }
-});
+}));
 
 // Route pour obtenir les données d'un widget spécifique
-router.get('/dashboard/widget/:widgetId/data', async (req, res) => {
+router.get('/dashboard/widget/:widgetId/data', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const { widgetId } = req.params;
     const { config = {} } = req.query;
@@ -197,45 +148,6 @@ router.get('/dashboard/widget/:widgetId/data', async (req, res) => {
         widgetData = recentActivity;
         break;
 
-      case 'user-trends':
-        const [trends] = await db.execute(`
-          SELECT 
-            DATE(created_at) as date,
-            COUNT(*) as new_users
-          FROM users 
-          WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-          GROUP BY DATE(created_at)
-          ORDER BY date ASC
-        `, [config.period === '30d' ? 30 : 7]);
-        widgetData = trends;
-        break;
-
-      case 'system-health':
-        widgetData = {
-          status: 'healthy',
-          uptime: '99.9%',
-          memory: '65%',
-          disk: '45%',
-          lastCheck: new Date().toISOString()
-        };
-        break;
-
-      case 'quick-actions':
-        widgetData = [
-          { id: 'create-user', label: 'Nouvel Utilisateur', icon: 'UserPlus' },
-          { id: 'export-data', label: 'Exporter Données', icon: 'Download' },
-          { id: 'system-backup', label: 'Sauvegarde', icon: 'Save' },
-          { id: 'clear-cache', label: 'Vider Cache', icon: 'Trash2' }
-        ];
-        break;
-
-      case 'alerts':
-        widgetData = [
-          { id: 1, type: 'info', message: 'Système fonctionnel', timestamp: new Date().toISOString() },
-          { id: 2, type: 'warning', message: 'Espace disque à 80%', timestamp: new Date().toISOString() }
-        ];
-        break;
-
       default:
         return res.status(404).json({
           success: false,
@@ -255,6 +167,6 @@ router.get('/dashboard/widget/:widgetId/data', async (req, res) => {
       message: 'Erreur lors du chargement des données du widget'
     });
   }
-});
+}));
 
 module.exports = router;

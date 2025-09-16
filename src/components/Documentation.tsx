@@ -26,7 +26,6 @@ import {
   Type
 } from 'lucide-react';
 import KeyboardShortcuts from './KeyboardShortcuts';
-import AccessibilityTest from './AccessibilityTest';
 import { createAppShortcuts } from '../hooks/useKeyboardNavigation';
 
 const Documentation: React.FC = () => {
@@ -324,8 +323,7 @@ const Documentation: React.FC = () => {
               </ul>
             </div>
 
-            {/* Test d'accessibilité */}
-            <AccessibilityTest />
+            {/* Test d'accessibilité supprimé lors du nettoyage */}
           </div>
         )}
       </div>

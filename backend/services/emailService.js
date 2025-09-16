@@ -378,13 +378,15 @@ Cet email a été envoyé automatiquement par le système PigeonFarm.
           .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #e9ecef; border-radius: 0 0 10px 10px; }
           .button { display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 25px; margin: 20px 0; font-weight: bold; }
           .feature { margin: 20px 0; padding: 15px; background-color: white; border-radius: 8px; border-left: 4px solid #667eea; }
-          .welcome-icon { font-size: 48px; margin-bottom: 20px; }
+          .welcome-icon { margin-bottom: 20px; text-align: center; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <div class="welcome-icon">🐦</div>
+            <div class="welcome-icon">
+              <img src="https://pigeonfarm.com/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png" alt="Logo PigeonFarm" style="height: 60px; width: auto;">
+            </div>
             <h1>Bienvenue sur PigeonFarm !</h1>
             <p>Votre aventure commence maintenant</p>
           </div>
@@ -485,7 +487,7 @@ Si vous n'avez pas créé de compte, vous pouvez ignorer cet email.
   async sendWelcomeEmail(user) {
     try {
       const templates = this.generateWelcomeTemplate(user);
-      const subject = '🐦 Bienvenue sur PigeonFarm !';
+      const subject = 'Bienvenue sur PigeonFarm !';
       
       await this.sendEmail(user.email, subject, templates.text, templates.html);
       
