@@ -28,8 +28,6 @@ class ApiService {
       }
     }
     
-    // Debug API désactivé
-    
     // Configuration par défaut pour l'authentification par session
     const defaultOptions: RequestInit = {
       credentials: 'include', // Inclure les cookies de session
@@ -42,6 +40,8 @@ class ApiService {
       },
       ...options,
     };
+
+    // Debug API désactivé
 
     try {
       // Utiliser fetch avec fallback XMLHttpRequest pour Edge Legacy
@@ -159,21 +159,16 @@ class ApiService {
         }
         if (data.sessionId) {
           setSessionId(data.sessionId);
-          // SessionId stocké
           
           // Stocker aussi dans localStorage comme fallback
           if (isLocalStorageAvailable()) {
             try {
               edgeLocalStorage.setItem('sessionId', data.sessionId);
-              // SessionId stocké dans localStorage
             } catch (error) {
               // Erreur localStorage ignorée
             }
           }
         }
-        
-        // Debug des cookies après connexion
-        // Cookies gérés silencieusement
       } catch (error) {
         // Erreur stockage ignorée
         // Continuer sans stockage local

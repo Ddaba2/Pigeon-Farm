@@ -229,12 +229,14 @@ class StatisticsService {
       `, [userId]);
       
       // Enregistrements de santé des couples de l'utilisateur
+      console.log('🔍 Calcul des statistiques de santé pour utilisateur ID:', userId);
       const healthCount = await executeQuery(`
         SELECT COUNT(*) as total 
         FROM healthRecords h
         JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
         WHERE c.user_id = ?
       `, [userId]);
+      console.log('🔍 Résultat requête santé:', healthCount[0]);
       
       return {
         totalCouples: couplesCount[0].total,

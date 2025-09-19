@@ -14,6 +14,7 @@ import Profile from './components/Profile';
 import AdminPanel from './components/AdminPanel';
 import Notifications from './components/Notifications';
 import ErrorBoundary from './components/ErrorBoundary';
+import AccessibilityPanel from './components/AccessibilityPanel';
 import { User } from './types/types';
 import { useDarkMode } from './hooks/useDarkMode';
 import { edgeLocalStorage } from './utils/storageManager';
@@ -25,8 +26,9 @@ function App() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showAccessibilityPanel, setShowAccessibilityPanel] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
-  const { isDark, toggleDark } = useDarkMode();
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
 
   useEffect(() => {
     const userData = edgeLocalStorage.getItem('user');
@@ -111,7 +113,7 @@ function App() {
       case 'help':
         return <Documentation />;
       default:
-        return <Dashboard />;
+        return <Dashboard onNavigate={setActiveTab} />;
     }
   };
 
@@ -172,10 +174,10 @@ function App() {
 
                 {/* Toggle Dark Mode */}
                 <button
-                  onClick={toggleDark}
+                  onClick={toggleDarkMode}
                   className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                  {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </button>
                 
                 {/* User Menu */}
@@ -237,7 +239,7 @@ function App() {
               activeTab={activeTab} 
               setActiveTab={setActiveTab} 
               userRole={user.role} 
-              onAccessibilityToggle={() => {}} 
+              onAccessibilityToggle={() => setShowAccessibilityPanel(true)} 
             />
 
             {/* Page Content */}
@@ -264,6 +266,14 @@ function App() {
               setShowNotifications(false);
               loadNotificationCount(); // Recharger le compteur après fermeture
             }} 
+          />
+        )}
+
+        {/* Accessibility Panel */}
+        {showAccessibilityPanel && (
+          <AccessibilityPanel 
+            isOpen={showAccessibilityPanel}
+            onClose={() => setShowAccessibilityPanel(false)}
           />
         )}
       </div>

@@ -41,7 +41,17 @@ const validateHealthRecord = (data) => {
 // Récupérer tous les enregistrements de santé
 router.get('/', authenticateUser, async (req, res) => {
   try {
-    const records = await healthService.getAllHealthRecords();
+    // Récupérer seulement les enregistrements de santé des couples/pigeonneaux de l'utilisateur connecté
+    const { executeQuery } = require('../config/database');
+    const records = await executeQuery(`
+      SELECT DISTINCT h.* 
+      FROM healthRecords h
+      LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
+      LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
+      LEFT JOIN couples c2 ON p.coupleId = c2.id
+      WHERE c.user_id = ? OR c2.user_id = ?
+      ORDER BY h.created_at DESC
+    `, [req.user.id, req.user.id]);
     res.json({ success: true, data: records });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

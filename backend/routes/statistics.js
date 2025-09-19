@@ -3,10 +3,11 @@ const router = express.Router();
 const statisticsService = require('../services/statisticsService');
 const { authenticateUser } = require('../middleware/auth');
 
-// Récupérer les statistiques du tableau de bord
+// Récupérer les statistiques du tableau de bord (par utilisateur)
 router.get('/dashboard', authenticateUser, async (req, res) => {
   try {
-    const stats = await statisticsService.getDashboardStats();
+    // Utiliser les statistiques filtrées par utilisateur au lieu des statistiques globales
+    const stats = await statisticsService.getStatsByUser(req.user.id);
     res.json({ success: true, data: stats });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

@@ -19,6 +19,7 @@ interface Egg {
 
 const EggTracking: React.FC = () => {
   const [eggs, setEggs] = useState<Egg[]>([]);
+  const [couples, setCouples] = useState<any[]>([]);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [confirmationModal, setConfirmationModal] = useState<{ isOpen: boolean; eggId: number | null }>({
     isOpen: false,
@@ -27,19 +28,26 @@ const EggTracking: React.FC = () => {
 
   // Charger les vraies données depuis l'API
   useEffect(() => {
-    const loadEggs = async () => {
+    const loadData = async () => {
       try {
-        const response = await apiService.getEggs();
-        if (response.success && response.data) {
-          setEggs(response.data);
+        // Charger les œufs
+        const eggsResponse = await apiService.getEggs();
+        if (eggsResponse.success && eggsResponse.data) {
+          setEggs(eggsResponse.data);
+        }
+        
+        // Charger les couples pour la liste déroulante
+        const couplesResponse = await apiService.getCouples();
+        if (couplesResponse.success && couplesResponse.data) {
+          setCouples(couplesResponse.data);
         }
       } catch (error) {
-        // console.error('Erreur lors du chargement des œufs:', error);
+        // console.error('Erreur lors du chargement des données:', error);
         showNotification('error', 'Erreur lors du chargement des données');
       }
     };
 
-    loadEggs();
+    loadData();
   }, []);
 
   const [showModal, setShowModal] = useState(false);
@@ -371,16 +379,21 @@ const EggTracking: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  ID/numéro de cage *
+                  Couple *
                 </label>
-                <input
-                  type="text"
+                <select
                   required
                   value={formData.coupleId}
                   onChange={(e) => setFormData({...formData, coupleId: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="Ex: CO0, A82"
-                />
+                >
+                  <option value="">Sélectionner un couple</option>
+                  {couples.map((couple) => (
+                    <option key={couple.id} value={couple.id}>
+                      {couple.name || couple.nestNumber} (ID: {couple.id})
+                    </option>
+                  ))}
+                </select>
               </div>
               </div>
 

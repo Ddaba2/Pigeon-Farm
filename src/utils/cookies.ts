@@ -20,8 +20,8 @@ export const setCookie = (name: string, value: string, days: number = 1): void =
     const expires = new Date();
     expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
     
-    // Configuration compatible Edge avec fallbacks
-    const cookieString = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax;Secure`;
+    // Configuration compatible Edge avec fallbacks (sans Secure pour localhost)
+    const cookieString = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
     
     // Essayer d'abord avec SameSite=Lax
     document.cookie = cookieString;

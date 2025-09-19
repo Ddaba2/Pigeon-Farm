@@ -67,22 +67,34 @@ class PigeonneauService {
     try {
     const { 
       coupleId, 
-      eggRecordId, 
+      eggRecordId = null, 
       birthDate, 
       sex, 
-      weight, 
-      weaningDate, 
-      status, 
-      salePrice, 
-      saleDate, 
-      buyer, 
-        observations 
+      weight = null, 
+      weaningDate = null, 
+      status = 'alive', 
+      salePrice = null, 
+      saleDate = null, 
+      buyer = null, 
+      observations = '' 
     } = pigeonneauData;
     
+      // Si aucun eggRecordId n'est fourni, créer un enregistrement d'œuf par défaut
+      let finalEggRecordId = eggRecordId;
+      if (!finalEggRecordId) {
+        console.log('🔍 Création d\'un enregistrement d\'œuf par défaut pour le pigeonneau...');
+        const eggResult = await executeQuery(`
+          INSERT INTO eggs (coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, createdAt, updated_at)
+          VALUES (?, ?, NULL, ?, NULL, TRUE, FALSE, 'Enregistrement automatique pour pigeonneau', NOW(), NOW())
+        `, [coupleId, birthDate, birthDate]);
+        finalEggRecordId = eggResult.insertId;
+        console.log('✅ Enregistrement d\'œuf créé avec ID:', finalEggRecordId);
+      }
+
       const result = await executeQuery(`
         INSERT INTO pigeonneaux (coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `, [coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations]);
+      `, [coupleId, finalEggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations]);
       
       return { id: result.insertId, ...pigeonneauData };
     } catch (error) {

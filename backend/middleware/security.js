@@ -31,10 +31,10 @@ const rateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Rate limiting pour l'authentification
+// Rate limiting pour l'authentification (assoupli pour le développement)
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 tentatives max
+  max: 50, // 50 tentatives max (augmenté pour les tests)
   message: {
     error: 'Trop de tentatives de connexion, veuillez réessayer dans 15 minutes.',
     retryAfter: 900

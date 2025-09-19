@@ -4,10 +4,10 @@ const coupleService = require('../services/coupleService');
 const { validateCouple } = require('../utils/validation');
 const { authenticateUser } = require('../middleware/auth');
 
-// Récupérer tous les couples
+// Récupérer tous les couples de l'utilisateur
 router.get('/', authenticateUser, async (req, res) => {
   try {
-    const couples = await coupleService.getAllCouples();
+    const couples = await coupleService.getCouplesByUser(req.user.id);
     res.json({ success: true, data: couples });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

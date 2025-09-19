@@ -5,31 +5,50 @@ const { authenticateUser } = require('../middleware/auth');
 
 // Validation pour les pigeonneaux
 const validatePigeonneau = (data) => {
+  console.log('🔍 Validation des données pigeonneau:', JSON.stringify(data, null, 2));
   const errors = [];
   
   if (!data.coupleId) {
     errors.push('ID du couple requis');
+    console.log('❌ coupleId manquant');
+  } else {
+    console.log('✅ coupleId présent:', data.coupleId, typeof data.coupleId);
   }
   
   if (!data.birthDate) {
     errors.push('Date de naissance requise');
+    console.log('❌ birthDate manquant');
+  } else {
+    console.log('✅ birthDate présent:', data.birthDate);
   }
   
   if (!data.sex || !['male', 'female', 'unknown'].includes(data.sex)) {
     errors.push('Sexe doit être male, female ou unknown');
+    console.log('❌ sex invalide:', data.sex);
+  } else {
+    console.log('✅ sex valide:', data.sex);
   }
   
-  if (!data.weight || data.weight <= 0) {
+  if (data.weight !== undefined && data.weight !== null && data.weight <= 0) {
     errors.push('Poids doit être supérieur à 0');
+    console.log('❌ weight invalide:', data.weight);
+  } else {
+    console.log('✅ weight OK:', data.weight);
   }
   
-  if (!data.status || !['active', 'sold', 'deceased'].includes(data.status)) {
-    errors.push('Statut doit être active, sold ou deceased');
+  if (data.status && !['alive', 'sold', 'dead', 'active', 'deceased'].includes(data.status)) {
+    errors.push('Statut doit être alive, sold, dead, active ou deceased');
+    console.log('❌ status invalide:', data.status);
+  } else {
+    console.log('✅ status OK:', data.status);
   }
   
   if (data.salePrice !== undefined && data.salePrice < 0) {
     errors.push('Prix de vente ne peut pas être négatif');
+    console.log('❌ salePrice invalide:', data.salePrice);
   }
+  
+  console.log('🔍 Résultat validation pigeonneau:', { isValid: errors.length === 0, errors });
   
   return {
     isValid: errors.length === 0,
@@ -40,7 +59,15 @@ const validatePigeonneau = (data) => {
 // Récupérer tous les pigeonneaux
 router.get('/', authenticateUser, async (req, res) => {
   try {
-    const pigeonneaux = await pigeonneauService.getAllPigeonneaux();
+    // Récupérer seulement les pigeonneaux des couples de l'utilisateur connecté
+    const { executeQuery } = require('../config/database');
+    const pigeonneaux = await executeQuery(`
+      SELECT p.* 
+      FROM pigeonneaux p
+      JOIN couples c ON p.coupleId = c.id
+      WHERE c.user_id = ?
+      ORDER BY p.created_at DESC
+    `, [req.user.id]);
     res.json({ success: true, data: pigeonneaux });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -63,14 +90,30 @@ router.get('/:id', authenticateUser, async (req, res) => {
 // Créer un nouveau pigeonneau
 router.post('/', authenticateUser, async (req, res) => {
   try {
+    console.log('🔍 POST /pigeonneaux - Données reçues:', JSON.stringify(req.body, null, 2));
+    console.log('🔍 Utilisateur:', req.user.username, 'ID:', req.user.id);
+    
     const validation = validatePigeonneau(req.body);
     if (!validation.isValid) {
+      console.log('❌ Validation échouée:', validation.errors);
       return res.status(400).json({ success: false, error: validation.errors.join(', ') });
     }
 
     const newPigeonneau = await pigeonneauService.createPigeonneau(req.body);
+    console.log('✅ Pigeonneau créé avec succès:', newPigeonneau);
     res.status(201).json({ success: true, data: newPigeonneau });
   } catch (error) {
+    console.log('❌ Erreur création pigeonneau:', error.message);
+    
+    // Message d'erreur plus spécifique pour les clés étrangères
+    if (error.message.includes('foreign key constraint fails')) {
+      const coupleId = req.body.coupleId;
+      return res.status(400).json({ 
+        success: false, 
+        error: `Le couple avec l'ID ${coupleId} n'existe pas ou ne vous appartient pas. Veuillez sélectionner un couple valide.`
+      });
+    }
+    
     res.status(500).json({ success: false, error: error.message });
   }
 });

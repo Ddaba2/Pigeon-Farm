@@ -17,6 +17,7 @@ interface Pigeonneau {
 
 const PigeonnalManagement: React.FC = () => {
   const [pigeonneaux, setPigeonneaux] = useState<Pigeonneau[]>([]);
+  const [couples, setCouples] = useState<any[]>([]);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [confirmationModal, setConfirmationModal] = useState<{ isOpen: boolean; pigeonneauId: number | null }>({
     isOpen: false,
@@ -25,19 +26,26 @@ const PigeonnalManagement: React.FC = () => {
 
   // Charger les vraies données depuis l'API
   useEffect(() => {
-    const loadPigeonneaux = async () => {
+    const loadData = async () => {
       try {
-        const response = await apiService.getPigeonneaux();
-        if (response.success && response.data) {
-          setPigeonneaux(response.data);
+        // Charger les pigeonneaux
+        const pigeonneauxResponse = await apiService.getPigeonneaux();
+        if (pigeonneauxResponse.success && pigeonneauxResponse.data) {
+          setPigeonneaux(pigeonneauxResponse.data);
+        }
+        
+        // Charger les couples pour la liste déroulante
+        const couplesResponse = await apiService.getCouples();
+        if (couplesResponse.success && couplesResponse.data) {
+          setCouples(couplesResponse.data);
         }
       } catch (error) {
-        // console.error('Erreur lors du chargement des pigeonneaux:', error);
+        // console.error('Erreur lors du chargement des données:', error);
         showNotification('error', 'Erreur lors du chargement des données');
       }
     };
 
-    loadPigeonneaux();
+    loadData();
   }, []);
 
   const [showModal, setShowModal] = useState(false);
@@ -66,7 +74,7 @@ const PigeonnalManagement: React.FC = () => {
     try {
       // Validation côté frontend
       if (!formData.coupleId || formData.coupleId.trim() === '') {
-        showNotification('error', 'Veuillez entrer un ID/numéro de cage valide');
+        showNotification('error', 'Veuillez sélectionner un couple');
         return;
       }
 
@@ -83,7 +91,7 @@ const PigeonnalManagement: React.FC = () => {
 
       // Transformer les données pour le backend
       const backendData = {
-        coupleId: formData.coupleId.trim(),
+        coupleId: parseInt(formData.coupleId),
         eggRecordId: null, // Pour l'instant, on peut laisser null
         birthDate: formData.birthDate,
         sex: formData.sex,
@@ -131,7 +139,7 @@ const PigeonnalManagement: React.FC = () => {
       coupleId: pigeonneau.coupleId.toString(),
       birthDate: pigeonneau.birthDate,
       sex: pigeonneau.sex,
-      weight: pigeonneau.weight.toString(),
+      weight: pigeonneau.weight?.toString() || '',
       status: pigeonneau.status,
       salePrice: pigeonneau.salePrice?.toString() || '',
       observations: pigeonneau.observations || ''
@@ -305,15 +313,20 @@ const PigeonnalManagement: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ID/numéro de cage *</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Couple *</label>
+                  <select
                     required
                     value={formData.coupleId}
                     onChange={(e) => setFormData({...formData, coupleId: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="Ex: CO0, A82"
-                  />
+                  >
+                    <option value="">Sélectionner un couple</option>
+                    {couples.map((couple) => (
+                      <option key={couple.id} value={couple.id}>
+                        {couple.name || couple.nestNumber} (ID: {couple.id})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

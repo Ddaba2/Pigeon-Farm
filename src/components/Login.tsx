@@ -84,11 +84,13 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
     acceptTerms: false
   });
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
 
     try {
@@ -154,7 +156,20 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
         });
 
         if (response.success) {
-          onAuthSuccess(response.user, 'Inscription réussie !');
+          // Basculer vers le mode connexion après inscription réussie
+          setIsLogin(true);
+          setFormData({
+            username: formData.username, // Garder le nom d'utilisateur
+            email: '',
+            password: '',
+            confirmPassword: '',
+            fullName: '',
+            acceptTerms: false
+          });
+          setError(null);
+          
+          // Afficher un message de succès
+          setSuccessMessage('Inscription réussie ! Veuillez maintenant vous connecter avec vos identifiants.');
         }
       }
     } catch (error: any) {
@@ -207,6 +222,23 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {successMessage && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-green-800">
+                    {successMessage}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
               <div className="flex items-start">
@@ -375,6 +407,7 @@ const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError(null);
+                setSuccessMessage(null);
                 setFormData({
                   username: '',
                   email: '',

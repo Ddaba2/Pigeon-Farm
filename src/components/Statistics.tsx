@@ -72,36 +72,37 @@ const Statistics: React.FC = () => {
   useEffect(() => {
     const loadStatistics = async () => {
       try {
-        const response = await apiService.get('/statistics/detailed');
+        const response = await apiService.getDashboardStats();
         if (response.success && response.data) {
+          console.log('🔍 Données statistiques reçues:', response.data);
           setStats({
             couples: {
-              total: response.data.couples?.total || 0,
-              active: response.data.couples?.active || 0,
-              reproduction: response.data.couples?.reproduction || 0,
-              inactive: response.data.couples?.inactive || 0
+              total: response.data.totalCouples || 0,
+              active: response.data.totalCouples || 0, // Pour l'instant, tous sont actifs
+              reproduction: 0,
+              inactive: 0
             },
             eggs: {
-              total: response.data.eggs?.total || 0,
-              incubation: 0, // À calculer selon la logique métier
-              hatched: response.data.eggs?.success1_count || 0,
-              failed: response.data.eggs?.failed_count || 0
+              total: response.data.totalEggs || 0,
+              incubation: response.data.totalEggs || 0, // Pour l'instant, tous en incubation
+              hatched: 0,
+              failed: 0
             },
             pigeonneaux: {
-              total: response.data.pigeonneaux?.total || 0,
-              active: response.data.pigeonneaux?.active || 0,
-              sold: response.data.pigeonneaux?.sold || 0,
-              deceased: response.data.pigeonneaux?.deceased || 0
+              total: response.data.totalPigeonneaux || 0,
+              active: response.data.totalPigeonneaux || 0, // Pour l'instant, tous actifs
+              sold: 0,
+              deceased: 0
             },
             health: {
-              total: response.data.health?.total || 0,
-              vaccinations: response.data.health?.vaccinations || 0,
-              treatments: response.data.health?.treatments || 0,
-              exams: response.data.health?.exams || 0
+              total: response.data.totalHealthRecords || 0,
+              vaccinations: response.data.totalHealthRecords || 0, // Pour l'instant, tout comme vaccinations
+              treatments: 0,
+              exams: 0
             },
             sales: {
-              total: response.data.sales?.total || 0,
-              totalRevenue: response.data.sales?.totalRevenue || 0
+              total: 0, // À calculer depuis les ventes
+              totalRevenue: 0
             }
           });
         }
