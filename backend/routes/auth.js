@@ -381,4 +381,82 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
   });
 }));
 
+// Route pour vérifier le statut d'authentification
+router.get('/me', asyncHandler(async (req, res) => {
+  console.log('🔍 Route /me appelée');
+  console.log('🍪 Cookies reçus:', req.cookies);
+  console.log('📋 Headers x-session-id:', req.headers['x-session-id']);
+  
+  const sessionId = req.cookies.sessionId || req.headers['x-session-id'];
+  
+  if (!sessionId) {
+    console.log('❌ Aucun sessionId trouvé');
+    return res.status(401).json({
+      success: false,
+      error: {
+        message: 'Session non trouvée',
+        code: 'NO_SESSION'
+      }
+    });
+  }
+  
+  console.log('✅ SessionId trouvé:', sessionId);
+
+  // Vérifier la session
+  console.log('🔍 Vérification de la session:', sessionId);
+  const session = await UserService.getSession(sessionId);
+  console.log('📋 Session trouvée:', session ? 'Oui' : 'Non');
+  
+  if (!session) {
+    console.log('❌ Session invalide ou expirée');
+    return res.status(401).json({
+      success: false,
+      error: {
+        message: 'Session invalide',
+        code: 'INVALID_SESSION'
+      }
+    });
+  }
+
+  // Récupérer les données utilisateur
+  const userId = session.user_id; // Le champ en base est 'user_id', pas 'userId'
+  console.log('👤 Récupération utilisateur ID:', userId);
+  console.log('📋 Type de userId:', typeof userId);
+  console.log('📋 Session complète:', session);
+  
+  if (!userId) {
+    console.log('❌ user_id est undefined ou null');
+    return res.status(401).json({
+      success: false,
+      error: {
+        message: 'Session invalide - userId manquant',
+        code: 'INVALID_SESSION_USER_ID'
+      }
+    });
+  }
+  
+  const user = await UserService.getUserById(userId);
+  console.log('📋 Utilisateur trouvé:', user ? 'Oui' : 'Non');
+  
+  if (!user) {
+    console.log('❌ Utilisateur non trouvé pour ID:', userId);
+    return res.status(401).json({
+      success: false,
+      error: {
+        message: 'Utilisateur non trouvé',
+        code: 'USER_NOT_FOUND'
+      }
+    });
+  }
+
+  // Retourner les données utilisateur (sans le mot de passe)
+  const { password, ...userWithoutPassword } = user;
+  console.log('✅ Utilisateur retourné:', userWithoutPassword.email);
+  
+  res.json({
+    success: true,
+    user: userWithoutPassword
+  });
+}));
+
 module.exports = router; 

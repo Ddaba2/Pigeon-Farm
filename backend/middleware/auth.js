@@ -79,15 +79,31 @@ const authenticateUser = (req, res, next) => {
 };
 
 // Fonction pour créer une session
-const createSession = (user) => {
-  const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  const session = {
-    user: { id: user.id, username: user.username, role: user.role, status: user.status },
-    createdAt: Date.now()
-  };
+const createSession = async (user) => {
+  const { executeQuery } = require('../config/database.js');
   
-  activeSessions.set(sessionId, session);
-  return sessionId;
+  const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const expiresAt = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // 24 heures en timestamp Unix
+  const createdAt = Math.floor(Date.now() / 1000); // Timestamp Unix actuel
+  
+  try {
+    // Créer la session en base de données
+    const sql = 'INSERT INTO sessions (session_id, user_id, expires_at, created_at, last_accessed_at) VALUES (?, ?, ?, ?, ?)';
+    await executeQuery(sql, [sessionId, user.id, expiresAt, createdAt, createdAt]);
+    
+    // Aussi stocker en mémoire pour compatibilité
+    const session = {
+      user: { id: user.id, username: user.username, role: user.role, status: user.status },
+      createdAt: Date.now()
+    };
+    activeSessions.set(sessionId, session);
+    
+    console.log('✅ Session créée en base:', sessionId);
+    return sessionId;
+  } catch (error) {
+    console.error('❌ Erreur création session:', error);
+    throw error;
+  }
 };
 
 // Fonction pour supprimer une session

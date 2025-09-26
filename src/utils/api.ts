@@ -201,6 +201,14 @@ class ApiService {
     }
   }
 
+  async checkAuthStatus() {
+    try {
+      return await this.request<{ success: boolean; user?: any }>('/auth/me');
+    } catch (error) {
+      return { success: false, user: null };
+    }
+  }
+
   // Méthodes génériques CRUD
   async get<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint);

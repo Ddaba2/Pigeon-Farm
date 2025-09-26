@@ -422,6 +422,18 @@ class UserService {
     }
   }
 
+  // Récupérer une session par sessionId
+  static async getSession(sessionId) {
+    try {
+      const sql = 'SELECT * FROM sessions WHERE session_id = ? AND expires_at > UNIX_TIMESTAMP()';
+      const sessions = await executeQuery(sql, [sessionId]);
+      return sessions[0] || null;
+    } catch (error) {
+      console.error('Erreur lors de la récupération de la session:', error);
+      throw error;
+    }
+  }
+
 }
 
 module.exports = UserService; 

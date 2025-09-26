@@ -28,6 +28,7 @@ const adminProfilesRouter = require('./routes/adminProfiles.js');
 const adminDashboardRouter = require('./routes/adminDashboard.js');
 const adminMetricsRouter = require('./routes/adminMetrics.js');
 const notificationsRouter = require('./routes/notifications.js');
+const oauthRouter = require('./routes/oauth.js');
 
 const app = express();
 const port = config.port;
@@ -155,6 +156,7 @@ app.get('/api/test', (req, res) => {
 
 // Configuration des routes API
 app.use('/api/auth', authRateLimiter, authRouter);
+app.use('/api/oauth', oauthRouter);
 app.use('/api/users', usersRouter);
 app.use('/api', passwordResetRouter);
 app.use('/api/couples', couplesRouter);
@@ -200,6 +202,7 @@ const server = app.listen(port, async () => {
   console.log(`   - /api/health (santé du serveur)`);
   console.log(`   - /api/test (test de connectivité)`);
   console.log(`   - /api/auth/* (authentification simple)`);
+  console.log(`   - /api/oauth/* (authentification Google OAuth)`);
   console.log(`   - /api/users (utilisateurs)`);
   console.log(`   - /api/couples/* (gestion des couples)`);
   console.log(`   - /api/eggs/* (suivi des œufs)`);

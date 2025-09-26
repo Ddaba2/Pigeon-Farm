@@ -19,6 +19,9 @@ import { User } from './types/types';
 import { useDarkMode } from './hooks/useDarkMode';
 import { edgeLocalStorage } from './utils/storageManager';
 import { getNotificationCount } from './utils/api';
+import apiService from './utils/api';
+import { useGlobalAuth } from './contexts/GlobalAuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -29,22 +32,44 @@ function App() {
   const [showAccessibilityPanel, setShowAccessibilityPanel] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { setHandleAuthSuccess } = useGlobalAuth();
 
   useEffect(() => {
-    const userData = edgeLocalStorage.getItem('user');
-    if (userData) {
+    const loadUserFromStorage = () => {
+      let userData = null;
+      
       try {
-        const user = JSON.parse(userData);
-        setUser(user);
-        // Si l'utilisateur est admin, ouvrir directement l'interface admin
-        if (user.role === 'admin') {
-          setShowAdminPanel(true);
-        }
+        userData = edgeLocalStorage.getItem('user');
       } catch (error) {
-        // console.error('Erreur lors du parsing des données utilisateur:', error);
-        edgeLocalStorage.removeItem('user');
+        console.warn('⚠️ Erreur edgeLocalStorage, fallback vers localStorage:', error);
+        try {
+          userData = localStorage.getItem('user');
+        } catch (error2) {
+          console.warn('⚠️ Erreur localStorage:', error2);
+        }
       }
-    }
+      
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          setUser(user);
+          // Si l'utilisateur est admin, ouvrir directement l'interface admin
+          if (user.role === 'admin') {
+            setShowAdminPanel(true);
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors du parsing des données utilisateur:', error);
+          try {
+            edgeLocalStorage.removeItem('user');
+          } catch {}
+          try {
+            localStorage.removeItem('user');
+          } catch {}
+        }
+      }
+    };
+
+    loadUserFromStorage();
   }, []);
 
   // Charger le nombre de notifications non lues
@@ -84,7 +109,16 @@ function App() {
   };
 
   const handleLogout = () => {
-    edgeLocalStorage.removeItem('user');
+    try {
+      edgeLocalStorage.removeItem('user');
+    } catch {}
+    try {
+      localStorage.removeItem('user');
+    } catch {}
+    try {
+      localStorage.removeItem('sessionId');
+    } catch {}
+    
     setUser(null);
     setActiveTab('dashboard');
     setShowAdminPanel(false);
@@ -119,7 +153,8 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+      <AuthProvider handleAuthSuccess={handleAuthSuccess}>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
         {/* Header */}
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -276,7 +311,8 @@ function App() {
             onClose={() => setShowAccessibilityPanel(false)}
           />
         )}
-      </div>
+        </div>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
