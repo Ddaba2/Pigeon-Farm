@@ -41,6 +41,7 @@ const corsOptions = {
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
     'http://localhost:3000',
+    'https://ton-frontend.netlify.app', // URL Netlify
     // Support pour Edge Enterprise et IE
     'http://localhost:*',
     'http://127.0.0.1:*'
