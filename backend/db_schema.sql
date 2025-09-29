@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(255) NOT NULL UNIQUE,
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NULL, -- NULL pour les comptes Google
     role VARCHAR(50) NOT NULL DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -17,11 +17,19 @@ CREATE TABLE IF NOT EXISTS users (
     email_verification_token VARCHAR(255) NULL,
     password_reset_token VARCHAR(255) NULL,
     password_reset_expires TIMESTAMP NULL,
+    -- Champs pour Google OAuth
+    google_id VARCHAR(255) NULL UNIQUE,
+    avatar_url VARCHAR(500) NULL,
+    auth_provider ENUM('local', 'google') DEFAULT 'local',
+    status ENUM('active', 'pending', 'blocked') DEFAULT 'active',
 
     
     INDEX idx_username (username),
     INDEX idx_email (email),
-    INDEX idx_role (role)
+    INDEX idx_role (role),
+    INDEX idx_google_id (google_id),
+    INDEX idx_auth_provider (auth_provider),
+    INDEX idx_status (status)
 );
 
 -- Table des couples

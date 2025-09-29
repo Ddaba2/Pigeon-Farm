@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const passport = require('./config/passport');
 const { config } = require('./config/config.js');
 const {
   helmetConfig,
@@ -14,6 +16,7 @@ const { testDatabaseConnection } = require('./config/database.js');
 
 // Import des routes
 const authRouter = require('./routes/auth.js');
+const oauthRouter = require('./routes/oauth.js');
 const passwordResetRouter = require('./routes/passwordReset.js');
 const usersRouter = require('./routes/users.js');
 const adminRouter = require('./routes/admin.js');
@@ -32,18 +35,30 @@ const notificationsRouter = require('./routes/notifications.js');
 const app = express();
 const port = config.port;
 
-// Configuration CORS compatible Edge
+// Configuration CORS compatible Edge avec support OAuth
 const corsOptions = {
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-    'http://localhost:3000',
-    // Support pour Edge Enterprise et IE
-    'http://localhost:*',
-    'http://127.0.0.1:*'
-  ],
+  origin: function (origin, callback) {
+    // Autoriser les requêtes sans origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174',
+      'http://localhost:3000',
+      // URLs de redirection OAuth
+      process.env.FRONTEND_SUCCESS_URI,
+      process.env.FRONTEND_ERROR_URI
+    ].filter(Boolean); // Supprimer les valeurs undefined
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('🚫 CORS bloqué pour origin:', origin);
+      callback(new Error('Non autorisé par CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
@@ -96,6 +111,23 @@ app.use(rateLimiter);
 app.use(securityLogger);
 app.use(basicSecurity);
 app.use(cookieParser());
+
+// Configuration de session pour Passport
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your_session_secret_key_here',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 heures
+  }
+}));
+
+// Initialisation de Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -155,6 +187,7 @@ app.get('/api/test', (req, res) => {
 
 // Configuration des routes API
 app.use('/api/auth', authRateLimiter, authRouter);
+app.use('/api/oauth', oauthRouter); // Routes OAuth Google
 app.use('/api/users', usersRouter);
 app.use('/api', passwordResetRouter);
 app.use('/api/couples', couplesRouter);
@@ -195,11 +228,12 @@ const server = app.listen(port, async () => {
   console.log(`📊 Mode: ${config.nodeEnv}`);
   console.log(`🌐 URL: http://localhost:${port}`);
   console.log(`🔒 Sécurité: Helmet, Rate Limiting, CORS configurés`);
-  console.log(`🔐 Authentification: Simple par session`);
+  console.log(`🔐 Authentification: Session + Google OAuth`);
   console.log(`📡 Routes disponibles:`);
   console.log(`   - /api/health (santé du serveur)`);
   console.log(`   - /api/test (test de connectivité)`);
   console.log(`   - /api/auth/* (authentification simple)`);
+  console.log(`   - /api/oauth/* (authentification Google OAuth)`);
   console.log(`   - /api/users (utilisateurs)`);
   console.log(`   - /api/couples/* (gestion des couples)`);
   console.log(`   - /api/eggs/* (suivi des œufs)`);

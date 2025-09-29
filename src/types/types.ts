@@ -1,7 +1,7 @@
 export interface User {
   id: number;
   username: string;
-  password: string;
+  password?: string; // Optionnel pour les comptes Google
   role: 'admin' | 'user';
   email: string;
   status: 'active' | 'blocked' | 'pending';
@@ -15,6 +15,9 @@ export interface User {
   updated_at?: string;
   last_login?: string;
   login_attempts?: number;
+  // Champs pour Google OAuth
+  google_id?: string;
+  auth_provider?: 'local' | 'google';
 }
 
 export interface Couple {

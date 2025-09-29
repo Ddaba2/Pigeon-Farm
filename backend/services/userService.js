@@ -422,6 +422,116 @@ class UserService {
     }
   }
 
+  // ========== MÉTHODES GOOGLE OAUTH ==========
+
+  // Créer un utilisateur via Google OAuth
+  static async createGoogleUser(userData) {
+    const { google_id, email, username, fullName, avatar_url } = userData;
+    
+    try {
+      const sql = `
+        INSERT INTO users (google_id, email, username, full_name, avatar_url, auth_provider, status, created_at, last_login) 
+        VALUES (?, ?, ?, ?, ?, 'google', 'active', NOW(), NOW())
+      `;
+      
+      const result = await executeQuery(sql, [
+        google_id,
+        email,
+        username,
+        fullName || '',
+        avatar_url || null
+      ]);
+      
+      // Récupérer l'utilisateur créé
+      const newUser = await this.getUserById(result.insertId);
+      return newUser;
+    } catch (error) {
+      console.error('Erreur lors de la création de l\'utilisateur Google:', error);
+      throw error;
+    }
+  }
+
+  // Lier un compte Google à un utilisateur existant
+  static async linkGoogleAccount(userId, google_id, avatar_url = null) {
+    try {
+      const sql = `
+        UPDATE users 
+        SET google_id = ?, avatar_url = COALESCE(?, avatar_url), auth_provider = 'google', updated_at = NOW() 
+        WHERE id = ?
+      `;
+      
+      await executeQuery(sql, [google_id, avatar_url, userId]);
+      
+      // Récupérer l'utilisateur mis à jour
+      return await this.getUserById(userId);
+    } catch (error) {
+      console.error('Erreur lors de la liaison du compte Google:', error);
+      throw error;
+    }
+  }
+
+  // Récupérer un utilisateur par Google ID
+  static async getUserByGoogleId(google_id) {
+    try {
+      const sql = 'SELECT * FROM users WHERE google_id = ?';
+      const users = await executeQuery(sql, [google_id]);
+      return users[0] || null;
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'utilisateur par Google ID:', error);
+      throw error;
+    }
+  }
+
+  // Vérifier si un Google ID est déjà utilisé
+  static async isGoogleIdAvailable(google_id, excludeUserId = null) {
+    try {
+      let sql = 'SELECT id FROM users WHERE google_id = ?';
+      let params = [google_id];
+      
+      if (excludeUserId) {
+        sql += ' AND id != ?';
+        params.push(excludeUserId);
+      }
+      
+      const users = await executeQuery(sql, params);
+      return users.length === 0;
+    } catch (error) {
+      console.error('Erreur lors de la vérification du Google ID:', error);
+      throw error;
+    }
+  }
+
+  // Mettre à jour l'avatar d'un utilisateur
+  static async updateAvatar(userId, avatar_url) {
+    try {
+      const sql = 'UPDATE users SET avatar_url = ?, updated_at = NOW() WHERE id = ?';
+      await executeQuery(sql, [avatar_url, userId]);
+      
+      // Récupérer l'utilisateur mis à jour
+      return await this.getUserById(userId);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'avatar:', error);
+      throw error;
+    }
+  }
+
+  // Récupérer les utilisateurs par fournisseur d'authentification
+  static async getUsersByAuthProvider(auth_provider) {
+    try {
+      const sql = `
+        SELECT id, username, email, full_name, role, status, auth_provider, created_at, last_login 
+        FROM users 
+        WHERE auth_provider = ? 
+        ORDER BY created_at DESC
+      `;
+      const users = await executeQuery(sql, [auth_provider]);
+      return users;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des utilisateurs par fournisseur:', error);
+      throw error;
+    }
+  }
+
 }
 
 module.exports = UserService; 

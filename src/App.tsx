@@ -90,6 +90,8 @@ function App() {
     setShowAdminPanel(false);
   };
 
+  // Les routes OAuth sont maintenant gérées par React Router dans main.tsx
+
   if (!user) {
     return <Login onAuthSuccess={handleAuthSuccess} />;
   }
