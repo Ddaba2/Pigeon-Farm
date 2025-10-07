@@ -35,7 +35,7 @@ class UserService {
   // Récupérer un utilisateur par ID
   static async getUserById(id) {
     try {
-      const sql = 'SELECT id, username, email, full_name, role, status, avatar_url, phone, address, bio, created_at, updated_at, last_login, login_attempts FROM users WHERE id = ?';
+      const sql = 'SELECT id, username, email, full_name, role, status, avatar_url, google_id, auth_provider, created_at, updated_at, last_login FROM users WHERE id = ?';
       const users = await executeQuery(sql, [id]);
       return users[0] || null;
     } catch (error) {
@@ -47,7 +47,7 @@ class UserService {
   // Récupérer un utilisateur par nom d'utilisateur
   static async getUserByUsername(username) {
     try {
-      const sql = 'SELECT * FROM users WHERE username = ?';
+      const sql = 'SELECT id, username, email, full_name, role, status, avatar_url, google_id, auth_provider, created_at, updated_at, last_login FROM users WHERE username = ?';
       const users = await executeQuery(sql, [username]);
       return users[0] || null;
     } catch (error) {
@@ -185,7 +185,7 @@ class UserService {
   static async getAllUsersForAdmin() {
     try {
       const sql = `
-        SELECT id, username, email, full_name, role, status, created_at, updated_at, last_login, login_attempts 
+        SELECT id, username, email, full_name, role, status, created_at, updated_at, last_login 
         FROM users 
         ORDER BY created_at DESC
       `;
@@ -251,7 +251,7 @@ class UserService {
   // Débloquer un utilisateur
   static async unblockUser(userId) {
     try {
-      const sql = 'UPDATE users SET status = ?, updated_at = NOW(), login_attempts = 0 WHERE id = ?';
+      const sql = 'UPDATE users SET status = ?, updated_at = NOW() WHERE id = ?';
       await executeQuery(sql, ['active', userId]);
       
       // Récupérer l'utilisateur mis à jour
@@ -355,7 +355,7 @@ class UserService {
   // Mettre à jour les informations de profil
   static async updateProfile(userId, profileData) {
     try {
-      const allowedFields = ['username', 'email', 'full_name', 'avatar_url', 'phone', 'address', 'bio'];
+      const allowedFields = ['username', 'email', 'full_name', 'avatar_url'];
       const fields = [];
       const values = [];
       

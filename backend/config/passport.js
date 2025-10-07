@@ -2,12 +2,13 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const UserService = require('../services/userService');
 
-// Configuration de la stratégie Google OAuth
-passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_REDIRECT_URI
-}, async (accessToken, refreshToken, profile, done) => {
+// Configuration de la stratégie Google OAuth (seulement si les variables sont définies)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5174/oauth/google/callback'
+  }, async (accessToken, refreshToken, profile, done) => {
     try {
         console.log('🔐 Google OAuth Profile:', {
             id: profile.id,
@@ -47,7 +48,10 @@ passport.use(new GoogleStrategy({
         console.error('❌ Erreur Google OAuth:', error);
         return done(error, null);
     }
-}));
+  }));
+} else {
+  console.log('⚠️ Google OAuth non configuré - variables GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET manquantes');
+}
 
 // Sérialisation de l'utilisateur pour la session
 passport.serializeUser((user, done) => {

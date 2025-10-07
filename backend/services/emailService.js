@@ -17,13 +17,15 @@ class EmailService {
         port: parseInt(process.env.SMTP_PORT) || 587,
         secure: false, // true pour 465, false pour autres ports
         auth: {
-          user: process.env.SMTP_USER || process.env.EMAIL_USER || 'dabadiallo694@gmail.com',
-          pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || 'pabu boof fjwe jntw'
+          user: process.env.SMTP_USER || process.env.EMAIL_USER,
+          pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
         }
       };
 
-      // Si pas de configuration SMTP, utiliser un service de test
-      if (!(process.env.SMTP_USER || process.env.EMAIL_USER) || !(process.env.SMTP_PASS || process.env.EMAIL_PASS)) {
+      // Si pas de configuration SMTP valide, utiliser un service de test
+      if (!process.env.SMTP_USER && !process.env.EMAIL_USER || 
+          (!process.env.SMTP_PASS && !process.env.EMAIL_PASS) ||
+          process.env.EMAIL_USER === 'votre-email@gmail.com') {
         console.log('⚠️ Configuration SMTP manquante, utilisation du mode test');
         // Mode test - les emails seront affichés dans la console
         this.transporter = {
