@@ -1,3 +1,12 @@
+-- =====================================================
+-- SCHÉMA DE BASE DE DONNÉES PIGEON FARM
+-- =====================================================
+-- Version mise à jour avec les corrections apportées :
+-- - Ajout de la colonne user_id dans la table sales
+-- - Ajout des champs phone, address, bio dans la table users
+-- - Correction des contraintes de clés étrangères
+-- =====================================================
+
 -- Création de la base de données
 CREATE DATABASE IF NOT EXISTS pigeon_manager DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE pigeon_manager;
@@ -19,10 +28,13 @@ CREATE TABLE IF NOT EXISTS users (
     password_reset_expires TIMESTAMP NULL,
     -- Champs pour Google OAuth
     google_id VARCHAR(255) NULL UNIQUE,
-    avatar_url VARCHAR(500) NULL,
+    avatar_url LONGBLOB NULL,
     auth_provider ENUM('local', 'google') DEFAULT 'local',
     status ENUM('active', 'pending', 'blocked') DEFAULT 'active',
-
+    -- Champs de profil ajoutés
+    phone VARCHAR(20) NULL,
+    address TEXT NULL,
+    bio TEXT NULL,
     
     INDEX idx_username (username),
     INDEX idx_email (email),
@@ -117,6 +129,7 @@ CREATE TABLE IF NOT EXISTS healthRecords (
 -- Table des ventes
 CREATE TABLE IF NOT EXISTS sales (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
     date DATE NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
     unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -125,6 +138,8 @@ CREATE TABLE IF NOT EXISTS sales (
     client VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
     INDEX idx_date (date),
     INDEX idx_client (client),
     INDEX idx_amount (amount)
@@ -176,6 +191,24 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     INDEX idx_created_at (created_at),
     INDEX idx_ip_address (ip_address)
 );
+
+-- Table des préférences utilisateur
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL UNIQUE,
+    push_notifications BOOLEAN DEFAULT TRUE,
+    email_notifications BOOLEAN DEFAULT TRUE,
+    sms_notifications BOOLEAN DEFAULT FALSE,
+    critical_alerts_only BOOLEAN DEFAULT TRUE,
+    quiet_hours_start TIME DEFAULT '22:00:00',
+    quiet_hours_end TIME DEFAULT '07:00:00',
+    timezone VARCHAR(50) DEFAULT 'Europe/Paris',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id)
+);
+
 -- Vérification de la structure
 SHOW TABLES;
 DESCRIBE users;

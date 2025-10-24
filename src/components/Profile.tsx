@@ -16,8 +16,10 @@ import {
   Settings,
   Shield,
   Upload,
-  X
+  X,
+  Bell
 } from 'lucide-react';
+import NotificationSettings from './NotificationSettings';
 import { User as UserType } from '../types/types';
 import apiService from '../utils/api';
 
@@ -27,7 +29,7 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = ({ user, onUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'danger'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'danger'>('profile');
   const [formData, setFormData] = useState({
     username: user.username || '',
     email: user.email || '',
@@ -134,7 +136,9 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdate }) => {
               setSuccess('Photo de profil mise à jour avec succès !');
               
               try {
-                localStorage.setItem('user', JSON.stringify(updatedUser));
+                // Import dynamique pour compatibilité module
+                const storageManager = await import('../utils/storageManager');
+                storageManager.edgeLocalStorage.setItem('user', JSON.stringify(updatedUser));
               } catch (error) {
                 // Silencieux
               }
@@ -177,11 +181,13 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdate }) => {
         setSuccess('Profil mis à jour avec succès !');
         
         // Sauvegarder en localStorage
-        try {
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-        } catch (error) {
-          // Silencieux
-        }
+              try {
+                // Import dynamique pour compatibilité module
+                const storageManager = await import('../utils/storageManager');
+                storageManager.edgeLocalStorage.setItem('user', JSON.stringify(updatedUser));
+              } catch (error) {
+                // Silencieux
+              }
       }
     } catch (error: any) {
       setError(error.response?.data?.error?.message || 'Erreur lors de la mise à jour du profil');
@@ -264,12 +270,17 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdate }) => {
 
       if (response.success) {
         // Déconnexion et redirection
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-        window.location.href = '/login';
+        const edgeLocalStorage = (await import('../utils/storageManager')).edgeLocalStorage;
+        edgeLocalStorage.removeItem('user');
+        edgeLocalStorage.removeItem('sessionId');
+        setSuccess('Compte supprimé avec succès. Redirection...');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
       }
     } catch (error: any) {
-      setError(error.response?.data?.error?.message || 'Erreur lors de la suppression du compte');
+      console.error('Erreur suppression compte:', error);
+      setError(error.response?.data?.error?.message || error.message || 'Erreur lors de la suppression du compte');
     } finally {
       setLoading(false);
     }
@@ -304,6 +315,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdate }) => {
           {[
             { id: 'profile', label: 'Profil', icon: User },
             { id: 'security', label: 'Sécurité', icon: Lock },
+            { id: 'notifications', label: 'Notifications', icon: Bell },
             { id: 'danger', label: 'Zone de danger', icon: AlertTriangle }
           ].map((tab) => (
             <button
@@ -638,6 +650,12 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdate }) => {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {activeTab === 'notifications' && (
+        <div className="space-y-6">
+          <NotificationSettings />
         </div>
       )}
 

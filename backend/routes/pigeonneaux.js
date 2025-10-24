@@ -4,29 +4,38 @@ const pigeonneauService = require('../services/pigeonneauService');
 const { authenticateUser } = require('../middleware/auth');
 
 // Validation pour les pigeonneaux
-const validatePigeonneau = (data) => {
+const validatePigeonneau = (data, isUpdate = false) => {
   console.log('🔍 Validation des données pigeonneau:', JSON.stringify(data, null, 2));
   const errors = [];
   
-  if (!data.coupleId) {
-    errors.push('ID du couple requis');
-    console.log('❌ coupleId manquant');
+  // Pour la création, ces champs sont obligatoires
+  if (!isUpdate) {
+    if (!data.coupleId) {
+      errors.push('ID du couple requis');
+      console.log('❌ coupleId manquant');
+    } else {
+      console.log('✅ coupleId présent:', data.coupleId, typeof data.coupleId);
+    }
+    
+    if (!data.birthDate) {
+      errors.push('Date de naissance requise');
+      console.log('❌ birthDate manquant');
+    } else {
+      console.log('✅ birthDate présent:', data.birthDate);
+    }
+    
+    if (!data.sex || !['male', 'female', 'unknown'].includes(data.sex)) {
+      errors.push('Sexe doit être male, female ou unknown');
+      console.log('❌ sex invalide:', data.sex);
+    } else {
+      console.log('✅ sex valide:', data.sex);
+    }
   } else {
-    console.log('✅ coupleId présent:', data.coupleId, typeof data.coupleId);
-  }
-  
-  if (!data.birthDate) {
-    errors.push('Date de naissance requise');
-    console.log('❌ birthDate manquant');
-  } else {
-    console.log('✅ birthDate présent:', data.birthDate);
-  }
-  
-  if (!data.sex || !['male', 'female', 'unknown'].includes(data.sex)) {
-    errors.push('Sexe doit être male, female ou unknown');
-    console.log('❌ sex invalide:', data.sex);
-  } else {
-    console.log('✅ sex valide:', data.sex);
+    // Pour la mise à jour, valider seulement si les champs sont présents
+    if (data.sex !== undefined && !['male', 'female', 'unknown'].includes(data.sex)) {
+      errors.push('Sexe doit être male, female ou unknown');
+      console.log('❌ sex invalide:', data.sex);
+    }
   }
   
   if (data.weight !== undefined && data.weight !== null && data.weight <= 0) {
@@ -81,9 +90,24 @@ router.get('/:id', authenticateUser, async (req, res) => {
     if (!pigeonneau) {
       return res.status(404).json({ success: false, error: 'Pigeonneau non trouvé' });
     }
-    res.json({ success: true, data: pigeonneau });
+    
+    // Vérifier que le pigeonneau appartient à l'utilisateur connecté
+    const { executeQuery } = require('../config/database');
+    const userPigeonneau = await executeQuery(`
+      SELECT p.* 
+      FROM pigeonneaux p
+      JOIN couples c ON p.coupleId = c.id
+      WHERE p.id = ? AND c.user_id = ?
+    `, [req.params.id, req.user.id]);
+    
+    if (userPigeonneau.length === 0) {
+      return res.status(404).json({ success: false, error: 'Pigeonneau non trouvé' });
+    }
+    
+    res.json({ success: true, data: userPigeonneau[0] });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Erreur lors de la récupération du pigeonneau:', error);
+    res.status(500).json({ success: false, error: 'Erreur interne du serveur' });
   }
 });
 
@@ -121,7 +145,7 @@ router.post('/', authenticateUser, async (req, res) => {
 // Mettre à jour un pigeonneau
 router.put('/:id', authenticateUser, async (req, res) => {
   try {
-    const validation = validatePigeonneau(req.body);
+    const validation = validatePigeonneau(req.body, true);
     if (!validation.isValid) {
       return res.status(400).json({ success: false, error: validation.errors.join(', ') });
     }

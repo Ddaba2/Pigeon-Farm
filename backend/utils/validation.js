@@ -57,11 +57,13 @@ export const validateCouple = (coupleData) => {
     errors.push('La race doit contenir au moins 2 caractères');
   }
   
-  if (!coupleData.male || coupleData.male.trim().length < 2) {
+  const male = coupleData.male || coupleData.maleId || coupleData.maleName;
+  if (!male || male.trim().length < 2) {
     errors.push('Le nom du mâle doit contenir au moins 2 caractères');
   }
   
-  if (!coupleData.female || coupleData.female.trim().length < 2) {
+  const female = coupleData.female || coupleData.femaleId || coupleData.femaleName;
+  if (!female || female.trim().length < 2) {
     errors.push('Le nom de la femelle doit contenir au moins 2 caractères');
   }
   

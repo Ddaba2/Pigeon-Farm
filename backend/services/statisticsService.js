@@ -18,7 +18,7 @@ class StatisticsService {
       
       // Compter les ventes
       const salesCount = await executeQuery('SELECT COUNT(*) as total FROM sales');
-      const salesRevenue = await executeQuery('SELECT SUM(total_amount) as total FROM sales');
+      const salesRevenue = await executeQuery('SELECT SUM(amount) as total FROM sales');
       
       // Compter les couples par statut
       const couplesByStatus = await executeQuery(`
@@ -87,7 +87,7 @@ class StatisticsService {
          ORDER BY created_at DESC
          LIMIT 2)
         UNION ALL
-        (SELECT 'sale' as type, CONCAT('Vente ', target_type, ' - ', buyer_name, ' (', total_amount, ' XOF)') as description, date as date, id, 'DollarSign' as icon
+        (SELECT 'sale' as type, CONCAT('Vente - ', client, ' (', amount, ' XOF)') as description, date as date, id, 'DollarSign' as icon
          FROM sales
          ORDER BY date DESC, created_at DESC
          LIMIT 2)
@@ -153,10 +153,10 @@ class StatisticsService {
       const salesStats = await executeQuery(`
         SELECT 
           COUNT(*) as total,
-          SUM(total_amount) as totalRevenue,
-          AVG(total_amount) as averagePrice,
-          MAX(total_amount) as maxPrice,
-          MIN(total_amount) as minPrice
+          SUM(amount) as totalRevenue,
+          AVG(amount) as averagePrice,
+          MAX(amount) as maxPrice,
+          MIN(amount) as minPrice
         FROM sales
       `);
       
@@ -165,8 +165,8 @@ class StatisticsService {
         SELECT 
           COUNT(*) as total,
           SUM(CASE WHEN type = 'vaccination' THEN 1 ELSE 0 END) as vaccinations,
-          SUM(CASE WHEN type = 'treatment' THEN 1 ELSE 0 END) as treatments,
-          SUM(CASE WHEN type = 'exam' THEN 1 ELSE 0 END) as exams
+          SUM(CASE WHEN type = 'traitement' THEN 1 ELSE 0 END) as treatments,
+          SUM(CASE WHEN type = 'exam' OR type = 'examen' THEN 1 ELSE 0 END) as exams
         FROM healthRecords
       `);
       
@@ -209,6 +209,8 @@ class StatisticsService {
   // Récupérer les statistiques par utilisateur
   async getStatsByUser(userId) {
     try {
+      console.log('🔍 Calcul des statistiques pour utilisateur ID:', userId);
+      
       // Couples de l'utilisateur
       const couplesCount = await executeQuery('SELECT COUNT(*) as total FROM couples WHERE user_id = ?', [userId]);
       
@@ -229,23 +231,39 @@ class StatisticsService {
       `, [userId]);
       
       // Enregistrements de santé des couples de l'utilisateur
-      console.log('🔍 Calcul des statistiques de santé pour utilisateur ID:', userId);
       const healthCount = await executeQuery(`
         SELECT COUNT(*) as total 
         FROM healthRecords h
         JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
         WHERE c.user_id = ?
       `, [userId]);
-      console.log('🔍 Résultat requête santé:', healthCount[0]);
       
-      return {
-        totalCouples: couplesCount[0].total,
-        totalEggs: eggsCount[0].total,
-        totalPigeonneaux: pigeonneauxCount[0].total,
-        totalHealthRecords: healthCount[0].total
+      // Ventes de l'utilisateur
+      const salesCount = await executeQuery('SELECT COUNT(*) as total FROM sales WHERE user_id = ?', [userId]);
+      const salesRevenue = await executeQuery('SELECT SUM(amount) as total FROM sales WHERE user_id = ?', [userId]);
+      
+      const stats = {
+        totalCouples: couplesCount[0]?.total || 0,
+        totalEggs: eggsCount[0]?.total || 0,
+        totalPigeonneaux: pigeonneauxCount[0]?.total || 0,
+        totalHealthRecords: healthCount[0]?.total || 0,
+        totalSales: salesCount[0]?.total || 0,
+        totalRevenue: salesRevenue[0]?.total || 0
       };
+      
+      console.log('🔍 Statistiques calculées:', stats);
+      return stats;
     } catch (error) {
-      throw new Error(`Erreur lors de la récupération des statistiques utilisateur: ${error.message}`);
+      console.error('❌ Erreur lors de la récupération des statistiques utilisateur:', error);
+      // Retourner des valeurs par défaut en cas d'erreur
+      return {
+        totalCouples: 0,
+        totalEggs: 0,
+        totalPigeonneaux: 0,
+        totalHealthRecords: 0,
+        totalSales: 0,
+        totalRevenue: 0
+      };
     }
   }
 

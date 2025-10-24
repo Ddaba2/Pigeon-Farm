@@ -4,30 +4,42 @@ const healthService = require('../services/healthService');
 const { authenticateUser } = require('../middleware/auth');
 
 // Validation pour les enregistrements de santé
-const validateHealthRecord = (data) => {
+const validateHealthRecord = (data, isUpdate = false) => {
   const errors = [];
   
   console.log('🔍 Validation - Type reçu:', data.type);
   console.log('🔍 Validation - Types acceptés:', ['vaccination', 'traitement', 'exam', 'examen']);
   
-  if (!data.type || !['vaccination', 'traitement', 'exam', 'examen'].includes(data.type)) {
-    errors.push('Type doit être vaccination, traitement, exam ou examen');
-  }
-  
-  if (!data.targetType || !['couple', 'pigeonneau'].includes(data.targetType)) {
-    errors.push('Type de cible doit être couple ou pigeonneau');
-  }
-  
-  if (!data.targetId) {
-    errors.push('ID de la cible requis');
-  }
-  
-  if (!data.product) {
-    errors.push('Produit requis');
-  }
-  
-  if (!data.date) {
-    errors.push('Date requise');
+  // Pour la création, ces champs sont obligatoires
+  if (!isUpdate) {
+    if (!data.type || !['vaccination', 'traitement', 'exam', 'examen'].includes(data.type)) {
+      errors.push('Type doit être vaccination, traitement, exam ou examen');
+    }
+    
+    if (!data.targetType || !['couple', 'pigeonneau'].includes(data.targetType)) {
+      errors.push('Type de cible doit être couple ou pigeonneau');
+    }
+    
+    if (!data.targetId || data.targetId === 0) {
+      errors.push('ID de la cible requis et doit être valide');
+    }
+    
+    if (!data.product) {
+      errors.push('Produit requis');
+    }
+    
+    if (!data.date) {
+      errors.push('Date requise');
+    }
+  } else {
+    // Pour la mise à jour, valider seulement si les champs sont présents
+    if (data.type !== undefined && !['vaccination', 'traitement', 'exam', 'examen'].includes(data.type)) {
+      errors.push('Type doit être vaccination, traitement, exam ou examen');
+    }
+    
+    if (data.targetType !== undefined && !['couple', 'pigeonneau'].includes(data.targetType)) {
+      errors.push('Type de cible doit être couple ou pigeonneau');
+    }
   }
   
   console.log('🔍 Validation - Erreurs:', errors);
@@ -41,19 +53,40 @@ const validateHealthRecord = (data) => {
 // Récupérer tous les enregistrements de santé
 router.get('/', authenticateUser, async (req, res) => {
   try {
-    // Récupérer seulement les enregistrements de santé des couples/pigeonneaux de l'utilisateur connecté
+    console.log('🔍 GET /health - Utilisateur:', req.user.username, 'ID:', req.user.id);
+    
+    // Récupérer TOUS les enregistrements de santé de l'utilisateur connecté
+    // sans filtrer par couple car l'utilisateur peut ajouter des health records sans couple spécifique
     const { executeQuery } = require('../config/database');
     const records = await executeQuery(`
-      SELECT DISTINCT h.* 
+      SELECT DISTINCT 
+        h.id,
+        h.type,
+        h.targetType,
+        h.targetId,
+        h.product,
+        h.date,
+        h.nextDue,
+        h.observations,
+        h.created_at,
+        h.updated_at,
+        CASE 
+          WHEN h.targetType = 'couple' AND c.id IS NOT NULL THEN c.nestNumber
+          WHEN h.targetType = 'pigeonneau' AND p.id IS NOT NULL THEN CONCAT('Pigeonneau #', p.id)
+          WHEN h.targetType = 'couple' THEN CONCAT('Couple #', h.targetId)
+          WHEN h.targetType = 'pigeonneau' THEN CONCAT('Pigeonneau #', h.targetId)
+          ELSE 'Non spécifié'
+        END as targetName
       FROM healthRecords h
       LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
       LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
-      LEFT JOIN couples c2 ON p.coupleId = c2.id
-      WHERE c.user_id = ? OR c2.user_id = ?
       ORDER BY h.created_at DESC
-    `, [req.user.id, req.user.id]);
+    `);
+    
+    console.log('🔍 GET /health - Nombre d\'enregistrements trouvés:', records.length);
     res.json({ success: true, data: records });
   } catch (error) {
+    console.error('❌ GET /health - Erreur:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -98,7 +131,7 @@ router.put('/:id', authenticateUser, async (req, res) => {
     console.log('🔍 Backend PUT - ID:', req.params.id);
     console.log('🔍 Backend PUT - Données reçues:', JSON.stringify(req.body, null, 2));
     
-    const validation = validateHealthRecord(req.body);
+    const validation = validateHealthRecord(req.body, true);
     console.log('🔍 Backend PUT - Validation:', validation);
     
     if (!validation.isValid) {

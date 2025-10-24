@@ -17,7 +17,13 @@ class EggService {
           e.success2,
           e.observations,
           e.createdAt,
-          e.updated_at
+          e.updated_at,
+          CASE 
+            WHEN e.success1 = 0 THEN 'failed'
+            WHEN e.hatchDate1 IS NOT NULL AND e.success1 = 1 THEN 'hatched'
+            WHEN e.hatchDate1 IS NOT NULL THEN 'hatched'
+            ELSE 'incubation'
+          END as status
         FROM eggs e
         LEFT JOIN couples c ON e.coupleId = c.id
         ORDER BY e.createdAt DESC
@@ -44,7 +50,13 @@ class EggService {
           e.success2,
           e.observations,
           e.createdAt,
-          e.updated_at
+          e.updated_at,
+          CASE 
+            WHEN e.success1 = 0 THEN 'failed'
+            WHEN e.hatchDate1 IS NOT NULL AND e.success1 = 1 THEN 'hatched'
+            WHEN e.hatchDate1 IS NOT NULL THEN 'hatched'
+            ELSE 'incubation'
+          END as status
         FROM eggs e 
         LEFT JOIN couples c ON e.coupleId = c.id
         WHERE e.id = ?
@@ -70,44 +82,99 @@ class EggService {
         observations = '' 
       } = eggData;
       
-      const result = await executeQuery(`
-        INSERT INTO eggs (coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, createdAt, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `, [coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations]);
+      // Vérifier que le couple existe et appartient à l'utilisateur
+      const coupleCheck = await executeQuery(
+        'SELECT id FROM couples WHERE id = ?',
+        [coupleId]
+      );
+      
+      if (coupleCheck.length === 0) {
+        throw new Error("Le couple spécifié n'existe pas");
+      }
+      
+      // Vérifier s'il existe déjà un enregistrement pour ce couple et cette date
+      const existingEggs = await executeQuery(
+        'SELECT id FROM eggs WHERE coupleId = ? AND egg1Date = ? AND (egg2Date = ? OR (egg2Date IS NULL AND ? IS NULL))',
+        [coupleId, egg1Date, egg2Date, egg2Date]
+      );
+      
+      if (existingEggs.length > 0) {
+        throw new Error("Un enregistrement d'œufs existe déjà pour ce couple et ces dates");
+      }
+      
+      const result = await executeQuery(
+        'INSERT INTO eggs (coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, createdAt, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
+        [coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations]
+      );
       
       return { id: result.insertId, ...eggData };
     } catch (error) {
-      throw new Error(`Erreur lors de la création de l'enregistrement d'œufs: ${error.message}`);
+      console.error("❌ Erreur dans createEgg:", error);
+      throw new Error("Erreur lors de la création de l'enregistrement d'œufs: " + error.message);
     }
   }
 
   // Mettre à jour un enregistrement d'œufs
   async updateEgg(id, eggData) {
     try {
-      const { 
-        coupleId, 
-        egg1Date, 
-        egg2Date = null, 
-        hatchDate1 = null, 
-        hatchDate2 = null, 
-        success1 = false, 
-        success2 = false, 
-        observations = '' 
-      } = eggData;
+      console.log('🔍 Mise à jour œuf - ID:', id, 'Data:', eggData);
       
-      const result = await executeQuery(`
-        UPDATE eggs 
-        SET coupleId = ?, egg1Date = ?, egg2Date = ?, hatchDate1 = ?, hatchDate2 = ?, success1 = ?, success2 = ?, observations = ?, updated_at = NOW()
-        WHERE id = ?
-      `, [coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, id]);
+      // Vérifier que l'œuf existe
+      const eggCheck = await executeQuery(
+        'SELECT id FROM eggs WHERE id = ?',
+        [id]
+      );
       
-      if (result.affectedRows === 0) {
-        throw new Error('Enregistrement d\'œufs non trouvé');
+      if (eggCheck.length === 0) {
+        throw new Error("Enregistrement d'œufs non trouvé");
       }
       
-      return { id, ...eggData };
+      // Construire dynamiquement la requête UPDATE
+      const fields = [];
+      const values = [];
+      
+      // Vérifier chaque champ et l'ajouter seulement s'il est défini
+      const fieldMappings = {
+        coupleId: 'coupleId',
+        egg1Date: 'egg1Date',
+        egg2Date: 'egg2Date',
+        hatchDate1: 'hatchDate1',
+        hatchDate2: 'hatchDate2',
+        success1: 'success1',
+        success2: 'success2',
+        observations: 'observations'
+      };
+      
+      for (const [key, dbField] of Object.entries(fieldMappings)) {
+        if (eggData[key] !== undefined) {
+          fields.push(dbField + ' = ?');
+          values.push(eggData[key]);
+        }
+      }
+      
+      if (fields.length === 0) {
+        throw new Error('Aucun champ à mettre à jour');
+      }
+      
+      fields.push('updated_at = NOW()');
+      values.push(id);
+      
+      const sql = 'UPDATE eggs SET ' + fields.join(', ') + ' WHERE id = ?';
+      console.log('🔍 SQL:', sql);
+      console.log('🔍 Values:', values);
+      
+      const result = await executeQuery(sql, values);
+      
+      if (result.affectedRows === 0) {
+        throw new Error("Enregistrement d'œufs non trouvé");
+      }
+      
+      // Récupérer l'œuf mis à jour
+      const updatedEgg = await this.getEggById(id);
+      return updatedEgg;
     } catch (error) {
-      throw new Error(`Erreur lors de la mise à jour de l'enregistrement d'œufs: ${error.message}`);
+      console.error('❌ Erreur updateEgg:', error);
+      throw new Error("Erreur lors de la mise à jour de l'enregistrement d'œufs: " + error.message);
     }
   }
 

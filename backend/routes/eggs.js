@@ -4,22 +4,25 @@ const eggService = require('../services/eggService');
 const { authenticateUser } = require('../middleware/auth');
 
 // Validation pour les œufs
-const validateEgg = (data) => {
+const validateEgg = (data, isUpdate = false) => {
   console.log('🔍 Validation des données œuf:', JSON.stringify(data, null, 2));
   const errors = [];
   
-  if (!data.coupleId) {
-    errors.push('ID du couple requis');
-    console.log('❌ coupleId manquant');
-  } else {
-    console.log('✅ coupleId présent:', data.coupleId);
-  }
-  
-  if (!data.egg1Date) {
-    errors.push('Date du premier œuf requise');
-    console.log('❌ egg1Date manquant');
-  } else {
-    console.log('✅ egg1Date présent:', data.egg1Date);
+  // Pour la création, ces champs sont obligatoires
+  if (!isUpdate) {
+    if (!data.coupleId) {
+      errors.push('ID du couple requis');
+      console.log('❌ coupleId manquant');
+    } else {
+      console.log('✅ coupleId présent:', data.coupleId);
+    }
+    
+    if (!data.egg1Date) {
+      errors.push('Date du premier œuf requise');
+      console.log('❌ egg1Date manquant');
+    } else {
+      console.log('✅ egg1Date présent:', data.egg1Date);
+    }
   }
   
   if (data.success1 !== undefined && typeof data.success1 !== 'boolean') {
@@ -98,6 +101,14 @@ router.post('/', authenticateUser, async (req, res) => {
       });
     }
     
+    // Message d'erreur pour les duplications
+    if (error.message.includes('existe déjà')) {
+      return res.status(400).json({ 
+        success: false, 
+        error: error.message
+      });
+    }
+    
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -108,7 +119,7 @@ router.put('/:id', authenticateUser, async (req, res) => {
     console.log('🔍 PUT /eggs/:id - ID:', req.params.id);
     console.log('🔍 Body reçu:', JSON.stringify(req.body, null, 2));
     
-    const validation = validateEgg(req.body);
+    const validation = validateEgg(req.body, true);
     console.log('🔍 Validation:', validation);
     
     if (!validation.isValid) {

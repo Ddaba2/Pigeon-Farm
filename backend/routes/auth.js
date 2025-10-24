@@ -3,11 +3,13 @@ const {
   hashPassword, 
   comparePassword,
   createSession,
-  destroySession
+  destroySession,
+  verifySession
 } = require('../middleware/auth.js');
 const { testDatabaseConnection } = require('../config/database.js');
 const { validateUser } = require('../utils/validation.js');
 const { asyncHandler } = require('../utils/errorHandler.js');
+const { getErrorMessage, createErrorResponse } = require('../utils/errorMessages.js');
 const UserService = require('../services/userService.js');
 const EmailService = require('../services/emailService.js');
 const NotificationService = require('../services/notificationService.js');
@@ -34,7 +36,8 @@ router.post('/register', asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Données invalides',
+        message: getErrorMessage('VALIDATION', 'INVALID_DATA'),
+        code: 'VALIDATION_INVALID_DATA',
         details: validation.errors
       }
     });
@@ -49,8 +52,8 @@ router.post('/register', asyncHandler(async (req, res) => {
     return res.status(409).json({
       success: false,
       error: {
-        message: 'Un utilisateur avec ce nom ou cet email existe déjà',
-        code: 'USER_EXISTS'
+        message: getErrorMessage('REGISTER', 'USER_EXISTS'),
+        code: 'REGISTER_USER_EXISTS'
       }
     });
   }
@@ -93,15 +96,13 @@ router.post('/register', asyncHandler(async (req, res) => {
 router.post('/login', asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   
-  console.log('🔐 Login attempt:', { username, password: '***' });
-  
   // Validation des données
   if (!username || !password) {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Nom d\'utilisateur et mot de passe requis',
-        code: 'MISSING_CREDENTIALS'
+        message: getErrorMessage('AUTH', 'MISSING_CREDENTIALS'),
+        code: 'AUTH_MISSING_CREDENTIALS'
       }
     });
   }
@@ -111,17 +112,14 @@ router.post('/login', asyncHandler(async (req, res) => {
     const user = await UserService.getUserByUsername(username) || await UserService.getUserByEmail(username);
     
     if (!user) {
-      console.log('❌ User not found:', username);
       return res.status(401).json({
         success: false,
         error: {
-          message: 'Nom d\'utilisateur ou mot de passe incorrect',
-          code: 'INVALID_CREDENTIALS'
+          message: getErrorMessage('AUTH', 'INVALID_CREDENTIALS'),
+          code: 'AUTH_INVALID_CREDENTIALS'
         }
       });
     }
-    
-    console.log('✅ User found:', user.username);
     
     // Vérifier le mot de passe
     const isPasswordValid = await comparePassword(password, user.password);
@@ -130,43 +128,37 @@ router.post('/login', asyncHandler(async (req, res) => {
       return res.status(401).json({
         success: false,
         error: {
-          message: 'Nom d\'utilisateur ou mot de passe incorrect',
-          code: 'INVALID_CREDENTIALS'
+          message: getErrorMessage('AUTH', 'INVALID_CREDENTIALS'),
+          code: 'AUTH_INVALID_CREDENTIALS'
         }
       });
     }
     
     // Vérifier le statut de l'utilisateur
     if (user.status === 'blocked') {
-      console.log('🚫 Blocked user attempted login:', user.username);
       return res.status(403).json({
         success: false,
         error: {
-          message: 'Votre compte a été bloqué. Contactez un administrateur.',
-          code: 'ACCOUNT_BLOCKED'
+          message: getErrorMessage('AUTH', 'ACCOUNT_BLOCKED'),
+          code: 'AUTH_ACCOUNT_BLOCKED'
         }
       });
     }
     
     if (user.status === 'pending') {
-      console.log('⏳ Pending user attempted login:', user.username);
       return res.status(403).json({
         success: false,
         error: {
-          message: 'Votre compte est en attente d\'approbation.',
-          code: 'ACCOUNT_PENDING'
+          message: getErrorMessage('AUTH', 'ACCOUNT_PENDING'),
+          code: 'AUTH_ACCOUNT_PENDING'
         }
       });
     }
     
     // Créer une session
-    const sessionId = createSession(user);
+    const sessionId = await createSession(user);
     
-    console.log('🍪 Setting cookie sessionId:', sessionId);
-    console.log('🌐 Request origin:', req.headers.origin);
-    console.log('🔗 Request host:', req.headers.host);
-    
-    // Définir le cookie de session (essai avec configuration minimale)
+    // Définir le cookie de session
     res.cookie('sessionId', sessionId, {
       httpOnly: false,
       secure: false,
@@ -178,8 +170,6 @@ router.post('/login', asyncHandler(async (req, res) => {
     // Ajouter aussi le sessionId dans les headers de réponse
     res.set('X-Session-ID', sessionId);
     
-    console.log('✅ Cookie set, response headers:', res.getHeaders());
-    
     res.json({
       success: true,
       message: 'Connexion réussie',
@@ -187,8 +177,12 @@ router.post('/login', asyncHandler(async (req, res) => {
         id: user.id,
         username: user.username,
         email: user.email,
-        fullName: user.fullName,
-        role: user.role
+        full_name: user.full_name,
+        role: user.role,
+        status: user.status,
+        created_at: user.created_at,
+        last_login: user.last_login,
+        avatar_url: user.avatar_url
       },
       sessionId
     });
@@ -197,7 +191,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     res.status(500).json({
       success: false,
       error: {
-        message: 'Erreur interne du serveur',
+        message: getErrorMessage('GENERAL', 'INTERNAL_ERROR'),
         code: 'INTERNAL_ERROR'
       }
     });
@@ -205,11 +199,11 @@ router.post('/login', asyncHandler(async (req, res) => {
 }));
 
 // Route de déconnexion
-router.post('/logout', (req, res) => {
+router.post('/logout', asyncHandler(async (req, res) => {
   const sessionId = req.cookies?.sessionId || req.headers['x-session-id'];
   
   if (sessionId) {
-    destroySession(sessionId);
+    await destroySession(sessionId);
   }
   
   // Supprimer le cookie de session
@@ -219,7 +213,7 @@ router.post('/logout', (req, res) => {
     success: true,
     message: 'Déconnexion réussie'
   });
-});
+}));
 
 
 
@@ -231,8 +225,8 @@ router.post('/verify', asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Nom d\'utilisateur et mot de passe requis',
-        code: 'MISSING_CREDENTIALS'
+        message: getErrorMessage('AUTH', 'MISSING_CREDENTIALS'),
+        code: 'AUTH_MISSING_CREDENTIALS'
       }
     });
   }
@@ -244,7 +238,7 @@ router.post('/verify', asyncHandler(async (req, res) => {
     return res.status(401).json({
       success: false,
       error: {
-        message: 'Utilisateur non trouvé',
+        message: getErrorMessage('USER', 'NOT_FOUND'),
         code: 'USER_NOT_FOUND'
       }
     });
@@ -257,8 +251,8 @@ router.post('/verify', asyncHandler(async (req, res) => {
     return res.status(401).json({
       success: false,
       error: {
-        message: 'Mot de passe incorrect',
-        code: 'INVALID_PASSWORD'
+        message: getErrorMessage('AUTH', 'INVALID_CREDENTIALS'),
+        code: 'AUTH_INVALID_CREDENTIALS'
       }
     });
   }
@@ -268,8 +262,8 @@ router.post('/verify', asyncHandler(async (req, res) => {
     return res.status(403).json({
       success: false,
       error: {
-        message: 'Votre compte a été bloqué. Contactez un administrateur.',
-        code: 'ACCOUNT_BLOCKED'
+        message: getErrorMessage('AUTH', 'ACCOUNT_BLOCKED'),
+        code: 'AUTH_ACCOUNT_BLOCKED'
       }
     });
   }
@@ -278,8 +272,8 @@ router.post('/verify', asyncHandler(async (req, res) => {
     return res.status(403).json({
       success: false,
       error: {
-        message: 'Votre compte est en attente d\'approbation.',
-        code: 'ACCOUNT_PENDING'
+        message: getErrorMessage('AUTH', 'ACCOUNT_PENDING'),
+        code: 'AUTH_ACCOUNT_PENDING'
       }
     });
   }
@@ -302,8 +296,8 @@ router.post('/forgot-password', asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Email requis',
-        code: 'EMAIL_REQUIRED'
+        message: getErrorMessage('VALIDATION', 'MISSING_REQUIRED'),
+        code: 'VALIDATION_EMAIL_REQUIRED'
       }
     });
   }
@@ -338,8 +332,8 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Email, code de réinitialisation et nouveau mot de passe requis',
-        code: 'MISSING_RESET_DATA'
+        message: getErrorMessage('VALIDATION', 'MISSING_REQUIRED'),
+        code: 'VALIDATION_MISSING_REQUIRED'
       }
     });
   }
@@ -349,7 +343,7 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Le nouveau mot de passe doit contenir au moins 6 caractères',
+        message: getErrorMessage('PASSWORD', 'TOO_SHORT'),
         code: 'PASSWORD_TOO_SHORT'
       }
     });
@@ -365,7 +359,7 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
     return res.status(404).json({
       success: false,
       error: {
-        message: 'Utilisateur non trouvé',
+        message: getErrorMessage('USER', 'NOT_FOUND'),
         code: 'USER_NOT_FOUND'
       }
     });
@@ -379,6 +373,75 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
     success: true,
     message: 'Mot de passe réinitialisé avec succès'
   });
+}));
+
+// Route de vérification de session
+router.get('/verify-session', asyncHandler(async (req, res) => {
+  // Check both cookies and headers like authenticateUser middleware
+  const sessionId = req.cookies?.sessionId || req.headers['x-session-id'];
+  
+  if (!sessionId) {
+    return res.status(401).json({
+      success: false,
+      error: {
+        message: 'Session ID manquant',
+        code: 'MISSING_SESSION_ID'
+      }
+    });
+  }
+  
+  try {
+    // Vérifier la session
+    const user = await verifySession(sessionId);
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: 'Session invalide ou expirée',
+          code: 'INVALID_SESSION'
+        }
+      });
+    }
+    
+    // Récupérer les données utilisateur à jour
+    const userData = await UserService.getUserById(user.id);
+    
+    if (!userData) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: 'Utilisateur non trouvé',
+          code: 'USER_NOT_FOUND'
+        }
+      });
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        full_name: userData.full_name,
+        role: userData.role,
+        status: userData.status,
+        created_at: userData.created_at,
+        last_login: userData.last_login
+      },
+      sessionId: sessionId
+    });
+    
+  } catch (error) {
+    console.error('Erreur lors de la vérification de session:', error);
+    res.status(401).json({
+      success: false,
+      error: {
+        message: 'Erreur lors de la vérification de session',
+        code: 'SESSION_VERIFICATION_ERROR'
+      }
+    });
+  }
 }));
 
 module.exports = router; 

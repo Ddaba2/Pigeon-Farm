@@ -18,7 +18,7 @@ const LegalModal: React.FC<LegalModalProps> = ({ isOpen, onClose, type }) => {
            <div className="text-center">
              {/* Logo */}
              <div className="flex justify-center mb-4">
-               <img 
+               <img
                  src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png" 
                  alt="PigeonFarm Logo" 
                  className="h-16 w-auto"

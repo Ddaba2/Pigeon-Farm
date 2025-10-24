@@ -14,6 +14,9 @@ const {
 const { globalErrorHandler, notFoundHandler } = require('./utils/errorHandler.js');
 const { testDatabaseConnection } = require('./config/database.js');
 
+// Les sessions sont maintenant gérées par backend/middleware/auth.js
+// et stockées dans MySQL (table sessions)
+
 // Import des routes
 const authRouter = require('./routes/auth.js');
 const oauthRouter = require('./routes/oauth.js');
@@ -31,11 +34,14 @@ const adminProfilesRouter = require('./routes/adminProfiles.js');
 const adminDashboardRouter = require('./routes/adminDashboard.js');
 const adminMetricsRouter = require('./routes/adminMetrics.js');
 const notificationsRouter = require('./routes/notifications.js');
+const alertsRouter = require('./routes/alerts.js');
+const userPreferencesRouter = require('./routes/userPreferences.js');
+const archiveRouter = require('./routes/archive.js');
 
 const app = express();
 const port = config.port;
 
-// Configuration CORS compatible Edge avec support OAuth
+// Configuration CORS compatible avec l'application desktop
 const corsOptions = {
   origin: function (origin, callback) {
     // Autoriser les requêtes sans origin (mobile apps, curl, etc.)
@@ -47,6 +53,9 @@ const corsOptions = {
       'http://127.0.0.1:5173',
       'http://127.0.0.1:5174',
       'http://localhost:3000',
+      'http://localhost:3002', // Backend server itself
+      'http://localhost:3005', // Standalone desktop app
+      'http://127.0.0.1:3005',
       // URLs de redirection OAuth
       process.env.FRONTEND_SUCCESS_URI,
       process.env.FRONTEND_ERROR_URI
@@ -146,6 +155,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Servir les fichiers statiques du frontend (pour le mode desktop)
+app.use(express.static('dist'));
+
 // Route de santé du serveur
 app.get('/api/health', (req, res) => {
   res.json({
@@ -160,8 +172,6 @@ app.get('/api/health', (req, res) => {
     }
   });
 });
-
-// Route de santé pour les enregistrements (supprimée)
 
 // Route de test de connectivité
 app.get('/api/test', (req, res) => {
@@ -197,6 +207,9 @@ app.use('/api/health-records', healthRouter);
 app.use('/api/statistics', statisticsRouter);
 app.use('/api/sales', salesRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/alerts', alertsRouter);
+app.use('/api/user-preferences', userPreferencesRouter);
+app.use('/api/archive', archiveRouter);
 
 // Routes d'administration (ordre important - spécifiques avant générales)
 app.use('/api/admin/trends', adminTrendsRouter);
@@ -204,6 +217,31 @@ app.use('/api/admin/profiles', adminProfilesRouter);
 app.use('/api/admin/dashboard', adminDashboardRouter);
 app.use('/api/admin/metrics', adminMetricsRouter);
 app.use('/api/admin', adminRouter); // Routes générales admin en dernier
+
+// Route pour servir l'application frontend (toutes les autres routes renvoient index.html)
+app.get('*', (req, res) => {
+  // Si nous sommes en mode desktop, servir le fichier index.html du build
+  res.sendFile(__dirname + '/dist/index.html', (err) => {
+    if (err) {
+      // En mode développement ou si le fichier n'existe pas, renvoyer une page de base
+      res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>PigeonFarm</title>
+          <meta charset="utf-8">
+        </head>
+        <body>
+          <h1>PigeonFarm Application</h1>
+          <p>L'application est en cours de chargement...</p>
+          <p>Si vous voyez ce message, cela signifie que le frontend n'a pas encore été construit.</p>
+          <p>Veuillez exécuter "npm run build" dans le répertoire racine du projet.</p>
+        </body>
+        </html>
+      `);
+    }
+  });
+});
 
 // Gestionnaire d'erreurs 404
 app.use(notFoundHandler);
@@ -259,6 +297,9 @@ const server = app.listen(port, async () => {
     console.error('❌ Erreur lors du test de connexion:', error);
     console.log('⚠️ Mode démo activé');
   }
+  
+  // Indiquer que le serveur est prêt pour l'application desktop
+  console.log('🏠 Serveur prêt pour l\'application desktop');
 });
 
 // Gestion de l'arrêt gracieux
@@ -278,4 +319,4 @@ const gracefulShutdown = (signal) => {
 };
 
 process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown); 
+process.on('SIGINT', gracefulShutdown);

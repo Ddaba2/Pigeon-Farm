@@ -19,13 +19,13 @@ const helmetConfig = helmet({
   }
 });
 
-// Rate limiting général
+// Rate limiting général (assoupli pour le développement)
 const rateLimiter = rateLimit({
-  windowMs: config.security.rateLimitWindowMs,
-  max: config.security.rateLimitMaxRequests,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // 1000 requêtes par 15 minutes (augmenté pour le développement)
   message: {
     error: 'Trop de requêtes depuis cette IP, veuillez réessayer plus tard.',
-    retryAfter: Math.ceil(config.security.rateLimitWindowMs / 1000)
+    retryAfter: 900
   },
   standardHeaders: true,
   legacyHeaders: false,

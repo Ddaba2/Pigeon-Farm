@@ -108,7 +108,7 @@ async function createSecureAdmin() {
     );
     
     allAdmins.forEach(admin => {
-      console.log(`   ${admin.id}. ${admin.username} (${admin.email}) - ${admin.status} - ${admin.created_at}`);
+      console.log(`   ${admin.id}. ${admin.username} (${admin.email}) - ${admin.status} - ${new Date(admin.created_at).toLocaleDateString('fr-FR')}`);
     });
 
   } catch (error) {

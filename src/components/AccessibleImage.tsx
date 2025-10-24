@@ -27,6 +27,9 @@ const AccessibleImage: React.FC<AccessibleImageProps> = ({
   const [hasError, setHasError] = useState(false);
   const [currentSrc, setCurrentSrc] = useState(src);
 
+  // Vérifier si c'est une image base64
+  const isBase64 = src && src.startsWith('data:image/');
+
   const handleLoad = () => {
     setIsLoading(false);
     setHasError(false);
@@ -44,6 +47,22 @@ const AccessibleImage: React.FC<AccessibleImageProps> = ({
       onError?.();
     }
   };
+
+  // Si c'est une image base64 et qu'elle est valide, l'afficher directement
+  if (isBase64 && !hasError) {
+    return (
+      <img
+        src={currentSrc}
+        alt={alt}
+        className={className}
+        width={width}
+        height={height}
+        loading={loading}
+        onLoad={handleLoad}
+        onError={handleError}
+      />
+    );
+  }
 
   if (hasError && !fallbackSrc) {
     return (

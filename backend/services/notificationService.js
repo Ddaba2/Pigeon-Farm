@@ -5,7 +5,7 @@ class NotificationService {
   static async getUserNotifications(userId, limit = 50, offset = 0) {
     try {
       const sql = `
-        SELECT id, user_id, title, message, type, is_read, created_at, updated_at
+        SELECT id, user_id, title, message, type, read_status as is_read, created_at
         FROM notifications 
         WHERE user_id = ? 
         ORDER BY created_at DESC 
@@ -23,9 +23,9 @@ class NotificationService {
   static async getUnreadNotifications(userId) {
     try {
       const sql = `
-        SELECT id, user_id, title, message, type, is_read, created_at, updated_at
+        SELECT id, user_id, title, message, type, read_status as is_read, created_at
         FROM notifications 
-        WHERE user_id = ? AND is_read = FALSE
+        WHERE user_id = ? AND read_status = FALSE
         ORDER BY created_at DESC
       `;
       const notifications = await executeQuery(sql, [userId]);
@@ -42,7 +42,7 @@ class NotificationService {
       const sql = `
         SELECT COUNT(*) as count
         FROM notifications 
-        WHERE user_id = ? AND is_read = FALSE
+        WHERE user_id = ? AND read_status = FALSE
       `;
       const result = await executeQuery(sql, [userId]);
       return result[0].count;
@@ -57,7 +57,7 @@ class NotificationService {
     try {
       const sql = `
         UPDATE notifications 
-        SET is_read = TRUE, updated_at = NOW()
+        SET read_status = TRUE
         WHERE id = ? AND user_id = ?
       `;
       const result = await executeQuery(sql, [notificationId, userId]);
@@ -73,8 +73,8 @@ class NotificationService {
     try {
       const sql = `
         UPDATE notifications 
-        SET is_read = TRUE, updated_at = NOW()
-        WHERE user_id = ? AND is_read = FALSE
+        SET read_status = TRUE
+        WHERE user_id = ? AND read_status = FALSE
       `;
       const result = await executeQuery(sql, [userId]);
       return result.affectedRows;
@@ -88,7 +88,7 @@ class NotificationService {
   static async createNotification(userId, title, message, type = 'info') {
     try {
       const sql = `
-        INSERT INTO notifications (user_id, title, message, type, is_read)
+        INSERT INTO notifications (user_id, title, message, type, read_status)
         VALUES (?, ?, ?, ?, FALSE)
       `;
       const result = await executeQuery(sql, [userId, title, message, type]);
@@ -119,7 +119,7 @@ class NotificationService {
     try {
       const sql = `
         DELETE FROM notifications 
-        WHERE user_id = ? AND is_read = TRUE
+        WHERE user_id = ? AND read_status = TRUE
       `;
       const result = await executeQuery(sql, [userId]);
       return result.affectedRows;

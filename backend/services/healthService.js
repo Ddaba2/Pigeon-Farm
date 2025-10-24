@@ -26,6 +26,7 @@ class HealthService {
         LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
         ORDER BY h.created_at DESC
       `);
+      console.log('🔍 HealthService.getAllHealthRecords - Nombre d\'enregistrements:', rows.length);
       return rows;
     } catch (error) {
       throw new Error(`Erreur lors de la récupération des enregistrements de santé: ${error.message}`);
@@ -77,13 +78,20 @@ class HealthService {
         observations = '' 
       } = healthData;
       
+      console.log('🔍 HealthService.createHealthRecord - Données:', JSON.stringify(healthData, null, 2));
+      
       const result = await executeQuery(`
         INSERT INTO healthRecords (type, targetType, targetId, product, date, nextDue, observations, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `, [type, targetType, targetId, product, date, nextDue, observations]);
       
-      return { id: result.insertId, ...healthData };
+      console.log('✅ HealthService.createHealthRecord - Résultat:', result.insertId);
+      
+      // Récupérer l'enregistrement créé avec toutes les données
+      const newRecord = await this.getHealthRecordById(result.insertId);
+      return newRecord;
     } catch (error) {
+      console.error('❌ HealthService.createHealthRecord - Erreur:', error.message);
       throw new Error(`Erreur lors de la création de l'enregistrement de santé: ${error.message}`);
     }
   }
@@ -91,28 +99,69 @@ class HealthService {
   // Mettre à jour un enregistrement de santé
   async updateHealthRecord(id, healthData) {
     try {
-      const { 
-        type, 
-        targetType, 
-        targetId, 
-        product, 
-        date, 
-        nextDue = null, 
-        observations = '' 
-      } = healthData;
+      console.log('🔍 Mise à jour health record - ID:', id, 'Data:', healthData);
       
-      const result = await executeQuery(`
-        UPDATE healthRecords 
-        SET type = ?, targetType = ?, targetId = ?, product = ?, date = ?, nextDue = ?, observations = ?, updated_at = NOW()
-        WHERE id = ?
-      `, [type, targetType, targetId, product, date, nextDue, observations, id]);
+      // Construire dynamiquement la requête UPDATE
+      const fields = [];
+      const values = [];
+      
+      if (healthData.type !== undefined) {
+        fields.push('type = ?');
+        values.push(healthData.type);
+      }
+      
+      if (healthData.targetType !== undefined) {
+        fields.push('targetType = ?');
+        values.push(healthData.targetType);
+      }
+      
+      if (healthData.targetId !== undefined) {
+        fields.push('targetId = ?');
+        values.push(healthData.targetId);
+      }
+      
+      if (healthData.product !== undefined) {
+        fields.push('product = ?');
+        values.push(healthData.product);
+      }
+      
+      if (healthData.date !== undefined) {
+        fields.push('date = ?');
+        values.push(healthData.date);
+      }
+      
+      if (healthData.nextDue !== undefined) {
+        fields.push('nextDue = ?');
+        values.push(healthData.nextDue);
+      }
+      
+      if (healthData.observations !== undefined) {
+        fields.push('observations = ?');
+        values.push(healthData.observations);
+      }
+      
+      if (fields.length === 0) {
+        throw new Error('Aucun champ à mettre à jour');
+      }
+      
+      fields.push('updated_at = NOW()');
+      values.push(id);
+      
+      const sql = `UPDATE healthRecords SET ${fields.join(', ')} WHERE id = ?`;
+      console.log('🔍 SQL:', sql);
+      console.log('🔍 Values:', values);
+      
+      const result = await executeQuery(sql, values);
       
       if (result.affectedRows === 0) {
         throw new Error('Enregistrement de santé non trouvé');
       }
       
-      return { id, ...healthData };
+      // Récupérer l'enregistrement de santé mis à jour
+      const updatedHealthRecord = await this.getHealthRecordById(id);
+      return updatedHealthRecord;
     } catch (error) {
+      console.error('❌ Erreur updateHealthRecord:', error);
       throw new Error(`Erreur lors de la mise à jour de l'enregistrement de santé: ${error.message}`);
     }
   }

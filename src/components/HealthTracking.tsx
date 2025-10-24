@@ -3,6 +3,7 @@ import { Heart, Plus, Search, Filter, Edit, Trash2, Download, X } from 'lucide-r
 import apiService from '../utils/api';
 import pdfExporter from '../utils/pdfExport';
 import ConfirmationModal from './ConfirmationModal';
+import { formatDateForInput } from '../utils/dateUtils';
 
 interface HealthRecord {
   id: number;
@@ -85,33 +86,61 @@ const HealthTracking: React.FC = () => {
         return;
       }
 
+      // Parser l'ID de la cible
+      let parsedTargetId: number;
+      
+      if (formData.targetType === 'couple') {
+        // Pour les couples, extraire les chiffres de la chaîne
+        const numericPart = formData.targetId.trim().replace(/\D/g, '');
+        parsedTargetId = parseInt(numericPart);
+        
+        if (isNaN(parsedTargetId) || parsedTargetId <= 0) {
+          showNotification('error', 'Veuillez entrer un numéro de couple valide. Exemples: 1, 2, 3 ou CO1 (le 1 sera utilisé)');
+          return;
+        }
+      } else {
+        // Pour les pigeonneaux, c'est toujours un nombre
+        parsedTargetId = parseInt(formData.targetId);
+        
+        if (isNaN(parsedTargetId) || parsedTargetId <= 0) {
+          showNotification('error', 'Veuillez entrer un ID de pigeonneau valide (nombre supérieur à 0)');
+          return;
+        }
+      }
+
       // Transformer les données pour le backend
       const backendData = {
         type: formData.type,
         targetType: formData.targetType,
-        targetId: formData.targetType === 'couple' ? formData.targetId.trim() : parseInt(formData.targetId),
+        targetId: parsedTargetId,
         product: formData.product,
         date: formData.date,
         observations: formData.observations
       };
+      
+      console.log('🔍 HealthTracking - Données envoyées:', JSON.stringify(backendData, null, 2));
 
       if (editingRecord) {
         // Modification
         const response = await apiService.updateHealthRecord(editingRecord.id, backendData);
         if (response.success) {
-          setRecords(records.map(r => 
-            r.id === editingRecord.id 
-              ? response.data
-              : r
-          ));
           showNotification('success', 'Enregistrement modifié avec succès');
+          // Recharger tous les enregistrements de santé depuis le serveur
+          const refreshResponse = await apiService.getHealthRecords();
+          if (refreshResponse.success && refreshResponse.data) {
+            setRecords(refreshResponse.data);
+          }
         }
       } else {
         // Ajout
         const response = await apiService.createHealthRecord(backendData);
         if (response.success) {
-          setRecords([...records, response.data]);
           showNotification('success', 'Enregistrement créé avec succès');
+          // Recharger tous les enregistrements de santé depuis le serveur
+          const refreshResponse = await apiService.getHealthRecords();
+          if (refreshResponse.success && refreshResponse.data) {
+            setRecords(refreshResponse.data);
+          }
         }
       }
       

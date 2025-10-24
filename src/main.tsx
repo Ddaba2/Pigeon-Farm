@@ -22,8 +22,8 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/politique-confidentialite" element={<PrivacyPolicy />} />
-        <Route path="/auth/success" element={<OAuthSuccess onAuthSuccess={() => {}} />} />
-        <Route path="/auth/error" element={<OAuthError />} />
+        <Route path="/oauth/success" element={<OAuthSuccess onAuthSuccess={() => {}} />} />
+        <Route path="/oauth/error" element={<OAuthError />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>

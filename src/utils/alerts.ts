@@ -1,15 +1,23 @@
 import { AppData } from '../types/types';
 
 async function sendHealthAlertEmail(alertText: string, to: string) {
-  await fetch('http://localhost:3001/send-health-alert', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      subject: 'Alerte santé PigeonFarm',
-      text: alertText,
-      to
-    })
-  });
+  try {
+    const response = await fetch('http://localhost:3002/api/alerts/send-health-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subject: 'Alerte santé PigeonFarm',
+        text: alertText,
+        to
+      })
+    });
+    
+    if (!response.ok) {
+      console.error('Erreur lors de l\'envoi de l\'alerte santé:', response.statusText);
+    }
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'alerte santé:', error);
+  }
 }
 
 export function getDashboardAlerts(data: AppData, userEmail: string): string[] {

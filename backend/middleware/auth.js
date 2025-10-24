@@ -1,35 +1,181 @@
 const bcrypt = require('bcryptjs');
-const { config } = require('../config/config.js');
-const { testDatabaseConnection } = require('../config/database.js');
+const { executeQuery } = require('../config/database.js');
 
-// Stockage temporaire des sessions (en production, utilisez Redis ou une base de données)
-const activeSessions = new Map();
+// Cache en mémoire pour performance
+let activeSessions = new Map();
+
+// Charger les sessions depuis MySQL
+async function loadSessions() {
+  try {
+    const now = new Date();
+    const sessions = await executeQuery(
+      'SELECT id, user_id, data, created_at, expires_at FROM sessions WHERE expires_at > ?',
+      [now]
+    );
+    
+    let loaded = 0;
+    for (const session of sessions) {
+      const sessionData = JSON.parse(session.data);
+      activeSessions.set(session.id, sessionData);
+      loaded++;
+    }
+    
+    console.log(`📂 Sessions chargées depuis MySQL: ${loaded} sessions actives`);
+  } catch (error) {
+    console.error('❌ Erreur lors du chargement des sessions:', error);
+    console.log('⚠️ Continuation avec les sessions existantes en mémoire');
+  }
+}
+
+// Sauvegarder une session dans MySQL
+async function saveSession(sessionId, session) {
+  try {
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    
+    await executeQuery(
+      `INSERT INTO sessions (id, user_id, data, expires_at) 
+       VALUES (?, ?, ?, ?) 
+       ON DUPLICATE KEY UPDATE data = ?, expires_at = ?`,
+      [
+        sessionId,
+        session.user.id,
+        JSON.stringify(session),
+        expiresAt,
+        JSON.stringify(session),
+        expiresAt
+      ]
+    );
+  } catch (error) {
+    console.error('❌ Erreur lors de la sauvegarde de la session:', error);
+  }
+}
+
+// Charger les sessions au démarrage
+loadSessions();
+
+// Fonction pour créer une session
+const createSession = async (user) => {
+  const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const session = {
+    id: sessionId,
+    user: {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      full_name: user.full_name,
+      avatar_url: user.avatar_url
+    },
+    createdAt: Date.now()
+  };
+  
+  activeSessions.set(sessionId, session);
+  await saveSession(sessionId, session); // Sauvegarder dans MySQL!
+  
+  console.log('✅ Session créée:', sessionId, 'pour utilisateur:', user.username);
+  return sessionId;
+};
+
+// Fonction pour détruire une session
+const destroySession = async (sessionId) => {
+  if (activeSessions.has(sessionId)) {
+    activeSessions.delete(sessionId);
+    // Supprimer de MySQL
+    try {
+      await executeQuery('DELETE FROM sessions WHERE id = ?', [sessionId]);
+    } catch (error) {
+      console.error('❌ Erreur lors de la suppression de la session:', error);
+    }
+    console.log('🗑️ Session détruite:', sessionId);
+    return true;
+  }
+  return false;
+};
+
+// Fonction pour vérifier une session
+const verifySession = async (sessionId) => {
+  if (!activeSessions.has(sessionId)) {
+    return null;
+  }
+  
+  const session = activeSessions.get(sessionId);
+  
+  // Vérifier si la session n'a pas expiré (24h)
+  if (Date.now() - session.createdAt > 24 * 60 * 60 * 1000) {
+    activeSessions.delete(sessionId);
+    // Supprimer de MySQL
+    try {
+      await executeQuery('DELETE FROM sessions WHERE id = ?', [sessionId]);
+    } catch (error) {
+      console.error('❌ Erreur lors de la suppression de la session expirée:', error);
+    }
+    return null;
+  }
+  
+  // Mettre à jour les données utilisateur depuis la BDD pour avoir les infos à jour
+  try {
+    const UserService = require('../services/userService');
+    const updatedUser = await UserService.getUserById(session.user.id);
+    
+    if (!updatedUser) {
+      // Utilisateur supprimé de la BDD
+      activeSessions.delete(sessionId);
+      saveSessions();
+      return null;
+    }
+    
+    // Mettre à jour la session avec les nouvelles données
+    session.user = {
+      id: updatedUser.id,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      status: updatedUser.status,
+      full_name: updatedUser.fullName,
+      avatar_url: updatedUser.avatar_url
+    };
+    
+    activeSessions.set(sessionId, session);
+    await saveSession(sessionId, session); // Sauvegarder dans MySQL
+    
+    return session.user;
+  } catch (error) {
+    console.error('❌ Erreur lors de la mise à jour de la session:', error);
+    // Retourner les données en cache en cas d'erreur BDD
+    return session.user;
+  }
+};
+
+// Fonctions de hachage et comparaison de mots de passe
+const hashPassword = async (password) => {
+  const saltRounds = 12;
+  return await bcrypt.hash(password, saltRounds);
+};
+
+const comparePassword = async (password, hashedPassword) => {
+  return await bcrypt.compare(password, hashedPassword);
+};
 
 // Middleware d'authentification simple par session
-const authenticateUser = (req, res, next) => {
+const authenticateUser = async (req, res, next) => {
   try {
-    // Debug de l'authentification
-    console.log('🔐 Auth check for:', req.method, req.path);
-    console.log('🍪 Cookies:', req.cookies);
-    console.log('📋 Headers:', req.headers['x-session-id'] ? 'x-session-id présent' : 'x-session-id manquant');
-    
     // Vérifier l'authentification par session
     // Priorité : cookies, puis en-tête x-session-id
     const sessionId = req.cookies?.sessionId || req.headers['x-session-id'];
     
-    console.log('🎫 SessionId reçu:', sessionId ? 'Présent' : 'Manquant');
+    console.log('🔍 Vérification de session - Session ID:', sessionId ? 'présent' : 'absent');
     
     if (!sessionId) {
-      console.log('❌ Aucun sessionId fourni');
       return res.status(401).json({ 
-        error: 'Authentification requise - Aucun sessionId fourni',
+        error: 'Authentification requise',
         code: 'AUTH_REQUIRED'
       });
     }
     
+    // Vérifier si la session existe dans le stockage en mémoire
     if (!activeSessions.has(sessionId)) {
-      console.log('❌ Session invalide:', sessionId);
-      console.log('📊 Sessions actives:', Array.from(activeSessions.keys()));
+      console.log('❌ Session non trouvée dans activeSessions');
       return res.status(401).json({ 
         error: 'Session invalide',
         code: 'INVALID_SESSION'
@@ -41,34 +187,25 @@ const authenticateUser = (req, res, next) => {
     // Vérifier si la session n'a pas expiré (24h)
     if (Date.now() - session.createdAt > 24 * 60 * 60 * 1000) {
       activeSessions.delete(sessionId);
+      // Supprimer de MySQL
+      try {
+        await executeQuery('DELETE FROM sessions WHERE id = ?', [sessionId]);
+      } catch (error) {
+        console.error('❌ Erreur lors de la suppression de la session expirée:', error);
+      }
+      console.log('❌ Session expirée');
       return res.status(401).json({ 
         error: 'Session expirée',
         code: 'SESSION_EXPIRED'
       });
     }
     
-    // Vérifier le statut de l'utilisateur
-    if (session.user.status === 'blocked') {
-      console.log('🚫 Blocked user attempted access:', session.user.username);
-      activeSessions.delete(sessionId); // Supprimer la session
-      return res.status(403).json({ 
-        error: 'Votre compte a été bloqué. Contactez un administrateur.',
-        code: 'ACCOUNT_BLOCKED'
-      });
-    }
-    
-    if (session.user.status === 'pending') {
-      console.log('⏳ Pending user attempted access:', session.user.username);
-      return res.status(403).json({ 
-        error: 'Votre compte est en attente d\'approbation.',
-        code: 'ACCOUNT_PENDING'
-      });
-    }
-    
-    // Ajouter l'utilisateur à la requête
+    // Ajouter l'utilisateur à la requête directement depuis la session
     req.user = session.user;
-    console.log('✅ Authentification réussie pour:', session.user.username);
+    
+    console.log('✅ Utilisateur authentifié:', req.user.username);
     next();
+    
   } catch (error) {
     console.error('❌ Erreur d\'authentification:', error);
     res.status(500).json({ 
@@ -78,118 +215,59 @@ const authenticateUser = (req, res, next) => {
   }
 };
 
-// Fonction pour créer une session
-const createSession = (user) => {
-  const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  const session = {
-    user: { id: user.id, username: user.username, role: user.role, status: user.status },
-    createdAt: Date.now()
-  };
+// Middleware pour vérifier le rôle admin
+const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      error: 'Authentification requise',
+      code: 'AUTH_REQUIRED'
+    });
+  }
   
-  activeSessions.set(sessionId, session);
-  return sessionId;
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Accès administrateur requis',
+      code: 'ADMIN_REQUIRED'
+    });
+  }
+  
+  next();
 };
 
-// Fonction pour supprimer une session
-const destroySession = (sessionId) => {
-  activeSessions.delete(sessionId);
-};
-
-// Middleware d'autorisation par rôle
-const requireRole = (roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ 
-        error: 'Authentification requise',
-        code: 'AUTH_REQUIRED'
-      });
+// Nettoyer les sessions expirées toutes les heures
+setInterval(async () => {
+  try {
+    const now = new Date();
+    const result = await executeQuery('DELETE FROM sessions WHERE expires_at < ?', [now]);
+    
+    if (result.affectedRows > 0) {
+      console.log(`🧹 Nettoyage MySQL: ${result.affectedRows} sessions expirées supprimées`);
     }
     
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        error: 'Permissions insuffisantes',
-        code: 'INSUFFICIENT_PERMISSIONS',
-        required: roles,
-        current: req.user.role
-      });
+    // Nettoyer aussi le cache mémoire
+    const memNow = Date.now();
+    let cleaned = 0;
+    for (const [sessionId, session] of activeSessions.entries()) {
+      if (memNow - session.createdAt > 24 * 60 * 60 * 1000) {
+        activeSessions.delete(sessionId);
+        cleaned++;
+      }
     }
     
-    next();
-  };
-};
-
-// Middleware d'autorisation admin
-const requireAdmin = requireRole(['admin']);
-
-// Middleware d'autorisation utilisateur ou admin
-const requireUserOrAdmin = requireRole(['user', 'admin']);
-
-// Fonction de hachage des mots de passe
-const hashPassword = async (password) => {
-  try {
-    const saltRounds = config.security.bcryptRounds;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-    return hashedPassword;
-  } catch (error) {
-    console.error('❌ Erreur de hachage du mot de passe:', error);
-    throw new Error('Erreur lors du hachage du mot de passe');
-  }
-};
-
-// Fonction de comparaison des mots de passe
-const comparePassword = async (password, hashedPassword) => {
-  try {
-    const isMatch = await bcrypt.compare(password, hashedPassword);
-    return isMatch;
-  } catch (error) {
-    console.error('❌ Erreur de comparaison des mots de passe:', error);
-    throw new Error('Erreur lors de la comparaison des mots de passe');
-  }
-};
-
-// Middleware de vérification des permissions sur les ressources
-const checkResourceOwnership = (resourceType) => {
-  return (req, res, next) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ 
-          error: 'Authentification requise',
-          code: 'AUTH_REQUIRED'
-        });
-      }
-      
-      // Les admins peuvent accéder à toutes les ressources
-      if (req.user.role === 'admin') {
-        return next();
-      }
-      
-      // Vérifier la propriété de la ressource
-      const resourceId = req.params.id || req.body.id;
-      if (!resourceId) {
-        return next(); // Pas d'ID, laisser passer
-      }
-      
-      // Ici, vous pourriez vérifier dans la base de données
-      // Pour l'instant, on laisse passer (à implémenter plus tard)
-      next();
-    } catch (error) {
-      console.error('❌ Erreur de vérification des permissions:', error);
-      res.status(500).json({ 
-        error: 'Erreur lors de la vérification des permissions',
-        code: 'PERMISSION_CHECK_ERROR'
-      });
+    if (cleaned > 0) {
+      console.log(`🧹 Nettoyage mémoire: ${cleaned} sessions expirées supprimées`);
     }
-  };
-};
+  } catch (error) {
+    console.error('❌ Erreur lors du nettoyage des sessions:', error);
+  }
+}, 60 * 60 * 1000); // Toutes les heures
 
 module.exports = {
   authenticateUser,
-  requireRole,
-  requireAdmin,
-  requireUserOrAdmin,
-  hashPassword,
-  comparePassword,
-  checkResourceOwnership,
   createSession,
-  destroySession
-}; 
+  destroySession,
+  verifySession,
+  requireAdmin,
+  hashPassword,
+  comparePassword
+};

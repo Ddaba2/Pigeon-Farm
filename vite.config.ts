@@ -10,6 +10,8 @@ export default defineConfig({
   },
   build: {
     target: 'es2015', // Compatible avec Edge
+    assetsDir: 'assets',
+    base: './', // Chemins relatifs pour Electron
     rollupOptions: {
       output: {
         manualChunks: {

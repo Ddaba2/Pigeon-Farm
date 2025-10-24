@@ -35,8 +35,29 @@ class UserService {
   // Récupérer un utilisateur par ID
   static async getUserById(id) {
     try {
-      const sql = 'SELECT id, username, email, full_name, role, status, avatar_url, google_id, auth_provider, created_at, updated_at, last_login FROM users WHERE id = ?';
+      const sql = 'SELECT id, username, email, full_name as fullName, role, status, avatar_url, google_id, auth_provider, created_at, updated_at, last_login, phone, address, bio FROM users WHERE id = ?';
       const users = await executeQuery(sql, [id]);
+      
+      if (users[0] && users[0].avatar_url) {
+        // Convertir le LONGBLOB en base64 pour l'affichage
+        // Si c'est déjà un Buffer (nouveau stockage LONGBLOB)
+        if (Buffer.isBuffer(users[0].avatar_url)) {
+          users[0].avatar_url = `data:image/jpeg;base64,${users[0].avatar_url.toString('base64')}`;
+        } 
+        // Si c'est une string (ancien stockage ou URL HTTP)
+        else if (typeof users[0].avatar_url === 'string') {
+          // Garder tel quel si c'est déjà une data URL ou une URL HTTP
+          if (!users[0].avatar_url.startsWith('data:') && !users[0].avatar_url.startsWith('http')) {
+            // Ancien format base64 sans préfixe
+            users[0].avatar_url = `data:image/jpeg;base64,${users[0].avatar_url}`;
+          }
+        }
+        // S'assurer que avatar_url est toujours une string
+        if (users[0].avatar_url && typeof users[0].avatar_url !== 'string') {
+          users[0].avatar_url = String(users[0].avatar_url);
+        }
+      }
+      
       return users[0] || null;
     } catch (error) {
       console.error('Erreur lors de la récupération de l\'utilisateur:', error);
@@ -47,7 +68,7 @@ class UserService {
   // Récupérer un utilisateur par nom d'utilisateur
   static async getUserByUsername(username) {
     try {
-      const sql = 'SELECT id, username, email, full_name, role, status, avatar_url, google_id, auth_provider, created_at, updated_at, last_login FROM users WHERE username = ?';
+      const sql = 'SELECT * FROM users WHERE username = ?';
       const users = await executeQuery(sql, [username]);
       return users[0] || null;
     } catch (error) {
@@ -265,38 +286,15 @@ class UserService {
   // Supprimer un utilisateur (admin seulement)
   static async deleteUserAdmin(userId) {
     try {
-      // Utiliser une transaction pour supprimer toutes les données liées
-      return await executeTransaction(async (connection) => {
-        // 1. Récupérer les IDs des couples de l'utilisateur
-        const [couples] = await connection.execute('SELECT id FROM couples WHERE user_id = ?', [userId]);
-        const coupleIds = couples.map(couple => couple.id);
-        
-        // 2. Supprimer les pigeonneaux liés aux couples de l'utilisateur
-        if (coupleIds.length > 0) {
-          const placeholders = coupleIds.map(() => '?').join(',');
-          await connection.execute(`DELETE FROM pigeonneaux WHERE coupleId IN (${placeholders})`, coupleIds);
-        }
-        
-        // 3. Supprimer les œufs liés aux couples de l'utilisateur
-        if (coupleIds.length > 0) {
-          const placeholders = coupleIds.map(() => '?').join(',');
-          await connection.execute(`DELETE FROM eggs WHERE coupleId IN (${placeholders})`, coupleIds);
-        }
-        
-        // 4. Supprimer les couples de l'utilisateur
-        await connection.execute('DELETE FROM couples WHERE user_id = ?', [userId]);
-        
-        // 5. Supprimer les ventes de l'utilisateur
-        await connection.execute('DELETE FROM sales WHERE user_id = ?', [userId]);
-        
-        // 6. Supprimer les notifications de l'utilisateur
-        await connection.execute('DELETE FROM notifications WHERE user_id = ?', [userId]);
-        
-        // 7. Supprimer l'utilisateur
-        await connection.execute('DELETE FROM users WHERE id = ?', [userId]);
-        
-        return true;
-      });
+      // Supprimer l'utilisateur directement (les contraintes de clé étrangère géreront le reste)
+      const sql = 'DELETE FROM users WHERE id = ?';
+      const result = await executeQuery(sql, [userId]);
+      
+      if (result.affectedRows === 0) {
+        return null;
+      }
+      
+      return { id: userId, deleted: true };
     } catch (error) {
       console.error('Erreur lors de la suppression de l\'utilisateur:', error);
       throw error;
@@ -308,12 +306,17 @@ class UserService {
   // Changer le mot de passe d'un utilisateur
   static async changePassword(userId, currentPassword, newPassword) {
     try {
+      console.log('🔑 changePassword - userId:', userId);
+      console.log('🔑 changePassword - currentPassword fourni:', !!currentPassword);
+      console.log('🔑 changePassword - newPassword longueur:', newPassword?.length);
+      
       // Récupérer l'utilisateur avec le mot de passe
       const sql = 'SELECT * FROM users WHERE id = ?';
       const users = await executeQuery(sql, [userId]);
       const user = users[0];
       
       if (!user) {
+        console.log('❌ Utilisateur non trouvé:', userId);
         return {
           success: false,
           message: 'Utilisateur non trouvé',
@@ -321,9 +324,15 @@ class UserService {
         };
       }
 
+      console.log('🔑 Utilisateur trouvé:', user.username);
+      console.log('🔑 Password hash exists:', !!user.password);
+
       // Vérifier le mot de passe actuel
       const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      console.log('🔑 Mot de passe actuel valide:', isCurrentPasswordValid);
+      
       if (!isCurrentPasswordValid) {
+        console.log('❌ Mot de passe actuel incorrect');
         return {
           success: false,
           message: 'Mot de passe actuel incorrect',
@@ -355,15 +364,76 @@ class UserService {
   // Mettre à jour les informations de profil
   static async updateProfile(userId, profileData) {
     try {
-      const allowedFields = ['username', 'email', 'full_name', 'avatar_url'];
+      const allowedFields = ['username', 'email', 'full_name', 'avatar_url', 'phone', 'address', 'bio'];
       const fields = [];
       const values = [];
       
-      for (const [key, value] of Object.entries(profileData)) {
-        if (allowedFields.includes(key) && value !== undefined) {
-          fields.push(`${key} = ?`);
-          values.push(value);
+      // Vérifier si l'email est déjà utilisé par un autre utilisateur
+      if (profileData.email !== undefined) {
+        const isEmailAvailable = await this.isEmailAvailable(profileData.email, userId);
+        if (!isEmailAvailable) {
+          throw new Error('Cet email est déjà utilisé par un autre utilisateur');
         }
+        fields.push('email = ?');
+        values.push(profileData.email);
+      }
+      
+      // Vérifier si le nom d'utilisateur est déjà utilisé par un autre utilisateur
+      if (profileData.username !== undefined) {
+        const isUsernameAvailable = await this.isUsernameAvailable(profileData.username, userId);
+        if (!isUsernameAvailable) {
+          throw new Error('Ce nom d\'utilisateur est déjà utilisé par un autre utilisateur');
+        }
+        fields.push('username = ?');
+        values.push(profileData.username);
+      }
+      
+      // Mettre à jour le nom complet si fourni
+      if (profileData.full_name !== undefined) {
+        fields.push('full_name = ?');
+        values.push(profileData.full_name);
+      }
+      
+      // Mettre à jour l'avatar si fourni
+      if (profileData.avatar_url !== undefined) {
+        if (profileData.avatar_url && profileData.avatar_url.length > 0) {
+          // Si c'est une data URL (base64), convertir en Buffer pour stockage en LONGBLOB
+          if (profileData.avatar_url.startsWith('data:')) {
+            // Extraire le base64 de la data URL
+            const base64Data = profileData.avatar_url.split(',')[1];
+            const avatarBuffer = Buffer.from(base64Data, 'base64');
+            fields.push('avatar_url = ?');
+            values.push(avatarBuffer);
+          } else if (profileData.avatar_url.startsWith('http://') || profileData.avatar_url.startsWith('https://')) {
+            // URLs HTTP/HTTPS : stocker directement
+            fields.push('avatar_url = ?');
+            values.push(profileData.avatar_url);
+          } else {
+            console.warn('URL d\'avatar invalide fournie:', profileData.avatar_url.substring(0, 50) + '...');
+          }
+        } else {
+          // Si avatar_url est null ou vide, le mettre à jour quand même
+          fields.push('avatar_url = ?');
+          values.push(profileData.avatar_url || null);
+        }
+      }
+      
+      // Mettre à jour le téléphone si fourni
+      if (profileData.phone !== undefined) {
+        fields.push('phone = ?');
+        values.push(profileData.phone || null);
+      }
+      
+      // Mettre à jour l'adresse si fournie
+      if (profileData.address !== undefined) {
+        fields.push('address = ?');
+        values.push(profileData.address || null);
+      }
+      
+      // Mettre à jour la bio si fournie
+      if (profileData.bio !== undefined) {
+        fields.push('bio = ?');
+        values.push(profileData.bio || null);
       }
       
       if (fields.length === 0) {

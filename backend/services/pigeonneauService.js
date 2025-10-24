@@ -79,59 +79,123 @@ class PigeonneauService {
       observations = '' 
     } = pigeonneauData;
     
-      // Si aucun eggRecordId n'est fourni, créer un enregistrement d'œuf par défaut
+      // Vérifier que le couple existe
+      const coupleCheck = await executeQuery(
+        'SELECT id FROM couples WHERE id = ?',
+        [coupleId]
+      );
+      
+      if (coupleCheck.length === 0) {
+        throw new Error("Le couple spécifié n'existe pas");
+      }
+    
+      // Si aucun eggRecordId n'est fourni, vérifier s'il existe déjà un enregistrement d'œuf pour cette date
       let finalEggRecordId = eggRecordId;
       if (!finalEggRecordId) {
-        console.log('🔍 Création d\'un enregistrement d\'œuf par défaut pour le pigeonneau...');
-        const eggResult = await executeQuery(`
-          INSERT INTO eggs (coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, createdAt, updated_at)
-          VALUES (?, ?, NULL, ?, NULL, TRUE, FALSE, 'Enregistrement automatique pour pigeonneau', NOW(), NOW())
-        `, [coupleId, birthDate, birthDate]);
-        finalEggRecordId = eggResult.insertId;
-        console.log('✅ Enregistrement d\'œuf créé avec ID:', finalEggRecordId);
+        console.log('🔍 Recherche d\'un enregistrement d\'œuf existant pour le pigeonneau...');
+        // Rechercher un enregistrement d'œuf existant pour ce couple et cette date
+        const existingEggs = await executeQuery(
+          'SELECT id FROM eggs WHERE coupleId = ? AND egg1Date = ? AND egg2Date IS NULL',
+          [coupleId, birthDate]
+        );
+        
+        if (existingEggs.length > 0) {
+          // Utiliser l'enregistrement existant
+          finalEggRecordId = existingEggs[0].id;
+          console.log('✅ Utilisation de l\'enregistrement d\'œuf existant avec ID:', finalEggRecordId);
+        } else {
+          // Créer un nouvel enregistrement d'œuf
+          console.log('🔍 Création d\'un nouvel enregistrement d\'œuf pour le pigeonneau...');
+          const eggResult = await executeQuery(
+            'INSERT INTO eggs (coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, createdAt, updated_at) VALUES (?, ?, NULL, ?, NULL, TRUE, FALSE, \'Enregistrement automatique pour pigeonneau\', NOW(), NOW())',
+            [coupleId, birthDate, birthDate]
+          );
+          finalEggRecordId = eggResult.insertId;
+          console.log('✅ Nouvel enregistrement d\'œuf créé avec ID:', finalEggRecordId);
+        }
       }
 
-      const result = await executeQuery(`
-        INSERT INTO pigeonneaux (coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `, [coupleId, finalEggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations]);
+      const result = await executeQuery(
+        'INSERT INTO pigeonneaux (coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
+        [coupleId, finalEggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations]
+      );
       
       return { id: result.insertId, ...pigeonneauData };
     } catch (error) {
-      throw new Error(`Erreur lors de la création du pigeonneau: ${error.message}`);
+      console.error("❌ Erreur dans createPigeonneau:", error);
+      throw new Error("Erreur lors de la création du pigeonneau: " + error.message);
     }
   }
 
   // Mettre à jour un pigeonneau
   async updatePigeonneau(id, pigeonneauData) {
     try {
-      const { 
-        coupleId, 
-        eggRecordId, 
-        birthDate, 
-        sex, 
-        weight, 
-        weaningDate, 
-        status, 
-        salePrice, 
-        saleDate, 
-        buyer, 
-        observations 
-      } = pigeonneauData;
+      console.log('🔍 Mise à jour pigeonneau - ID:', id, 'Data:', pigeonneauData);
       
-      const result = await executeQuery(`
-        UPDATE pigeonneaux 
-        SET coupleId = ?, eggRecordId = ?, birthDate = ?, sex = ?, weight = ?, weaningDate = ?, status = ?, salePrice = ?, saleDate = ?, buyer = ?, observations = ?, updated_at = NOW()
-        WHERE id = ?
-      `, [coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations, id]);
+      // Vérifier que le pigeonneau existe
+      const pigeonneauCheck = await executeQuery(
+        'SELECT id FROM pigeonneaux WHERE id = ?',
+        [id]
+      );
+      
+      if (pigeonneauCheck.length === 0) {
+        throw new Error('Pigeonneau non trouvé');
+      }
+      
+      // Construire dynamiquement la requête UPDATE
+      const fields = [];
+      const values = [];
+      
+      // Vérifier chaque champ et l'ajouter seulement s'il est défini
+      const fieldMappings = {
+        coupleId: 'coupleId',
+        eggRecordId: 'eggRecordId',
+        birthDate: 'birthDate',
+        sex: 'sex',
+        weight: 'weight',
+        weaningDate: 'weaningDate',
+        status: 'status',
+        salePrice: 'salePrice',
+        saleDate: 'saleDate',
+        buyer: 'buyer',
+        observations: 'observations'
+      };
+      
+      for (const [key, dbField] of Object.entries(fieldMappings)) {
+        if (pigeonneauData[key] !== undefined) {
+          // Ne pas mettre à jour eggRecordId s'il est null et que le pigeonneau en a déjà un
+          if (key === 'eggRecordId' && pigeonneauData[key] === null) {
+            continue; // Ignorer les valeurs null pour eggRecordId
+          }
+          fields.push(dbField + ' = ?');
+          values.push(pigeonneauData[key]);
+        }
+      }
+      
+      if (fields.length === 0) {
+        throw new Error('Aucun champ à mettre à jour');
+      }
+      
+      fields.push('updated_at = NOW()');
+      // Add id at the end for WHERE clause
+      values.push(id);
+      
+      const sql = 'UPDATE pigeonneaux SET ' + fields.join(', ') + ' WHERE id = ?';
+      console.log('🔍 SQL:', sql);
+      console.log('🔍 Values:', values);
+      
+      const result = await executeQuery(sql, values);
       
       if (result.affectedRows === 0) {
         throw new Error('Pigeonneau non trouvé');
       }
       
-      return { id, ...pigeonneauData };
+      // Récupérer le pigeonneau mis à jour
+      const updatedPigeonneau = await this.getPigeonneauById(id);
+      return updatedPigeonneau;
     } catch (error) {
-      throw new Error(`Erreur lors de la mise à jour du pigeonneau: ${error.message}`);
+      console.error('❌ Erreur updatePigeonneau:', error);
+      throw new Error("Erreur lors de la mise à jour du pigeonneau: " + error.message);
     }
   }
 

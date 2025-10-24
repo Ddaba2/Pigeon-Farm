@@ -1,25 +1,53 @@
-const mysql = require('mysql2/promise');
 const { config } = require('./config.js');
+const fs = require('fs');
+const path = require('path');
 
-// Configuration de la connexion MySQL
-const dbConfig = {
-  host: config.database.host,
-  user: config.database.user,
-  password: config.database.password,
-  database: config.database.name,
-  port: config.database.port,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  // Add connection timeout and retry options
-  connectTimeout: 60000
-};
+// Vérifier si MySQL est disponible
+let mysql;
+try {
+  mysql = require('mysql2/promise');
+} catch (error) {
+  console.log('⚠️  MySQL non disponible, utilisation du mode lecture seule');
+  mysql = null;
+}
 
-// Création du pool de connexions
-const pool = mysql.createPool(dbConfig);
+// Vérifier si le fichier SQLite existe
+const sqliteDbPath = path.join(__dirname, '../pigeon_manager.db');
+const useSQLite = fs.existsSync(sqliteDbPath) && !mysql;
+
+let pool, dbConfig;
+
+if (!useSQLite && mysql) {
+  // Configuration de la connexion MySQL
+  dbConfig = {
+    host: config.database.host,
+    user: config.database.user,
+    password: config.database.password,
+    database: config.database.name,
+    port: config.database.port,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    connectTimeout: 60000
+  };
+
+  // Création du pool de connexions
+  pool = mysql.createPool(dbConfig);
+}
 
 // Test de connexion à la base de données
 const testDatabaseConnection = async () => {
+  if (useSQLite) {
+    console.log('✅ Mode SQLite (lecture seule) - Utilisation du fichier pigeon_manager.db');
+    console.log(`📊 Base de données: ${sqliteDbPath}`);
+    return true;
+  }
+  
+  if (!mysql) {
+    console.log('⚠️  MySQL non disponible - Certaines fonctionnalités seront limitées');
+    return false;
+  }
+
   try {
     const connection = await pool.getConnection();
     console.log('✅ Connexion à MySQL réussie !');
@@ -50,6 +78,17 @@ const testDatabaseConnection = async () => {
 
 // Fonction pour exécuter des requêtes
 const executeQuery = async (sql, params = []) => {
+  if (useSQLite) {
+    // Pour le mode SQLite, retourner un tableau vide ou une erreur
+    // car nous ne pouvons pas écrire dans la base de données SQLite existante
+    console.warn('⚠️  Mode lecture seule - Impossible d\'exécuter des requêtes d\'écriture');
+    throw new Error('Fonctionnalité non disponible en mode lecture seule. Veuillez configurer MySQL pour les opérations d\'écriture.');
+  }
+  
+  if (!mysql) {
+    throw new Error('MySQL non disponible. Veuillez installer MySQL pour les opérations de base de données.');
+  }
+
   try {
     const [rows] = await pool.execute(sql, params);
     return rows;
@@ -61,6 +100,14 @@ const executeQuery = async (sql, params = []) => {
 
 // Fonction pour exécuter des requêtes avec transaction
 const executeTransaction = async (queriesOrCallback) => {
+  if (useSQLite) {
+    throw new Error('Transactions non disponibles en mode lecture seule. Veuillez configurer MySQL.');
+  }
+  
+  if (!mysql) {
+    throw new Error('MySQL non disponible. Veuillez installer MySQL pour les transactions.');
+  }
+
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -90,10 +137,11 @@ const executeTransaction = async (queriesOrCallback) => {
 };
 
 module.exports = {
-  pool,
+  pool: pool || null,
   testDatabaseConnection,
   executeQuery,
   executeTransaction,
   dbConfig,
-  execute: executeQuery
-}; 
+  execute: executeQuery,
+  isReadOnly: useSQLite
+};

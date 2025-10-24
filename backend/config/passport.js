@@ -51,6 +51,26 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   }));
 } else {
   console.log('⚠️ Google OAuth non configuré - variables GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET manquantes');
+  
+  // Ajouter une stratégie Google OAuth de test pour éviter l'erreur "Unknown authentication strategy"
+  passport.use('google', {
+    authenticate: (req, res, next) => {
+      res.status(501).json({
+        success: false,
+        error: {
+          message: 'Google OAuth non configuré - Variables d\'environnement manquantes',
+          code: 'OAUTH_NOT_CONFIGURED',
+          details: {
+            required: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
+            missing: [
+              !process.env.GOOGLE_CLIENT_ID ? 'GOOGLE_CLIENT_ID' : null,
+              !process.env.GOOGLE_CLIENT_SECRET ? 'GOOGLE_CLIENT_SECRET' : null
+            ].filter(Boolean)
+          }
+        }
+      });
+    }
+  });
 }
 
 // Sérialisation de l'utilisateur pour la session

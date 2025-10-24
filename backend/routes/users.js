@@ -2,8 +2,10 @@ const express = require('express');
 const { authenticateUser, requireAdmin } = require('../middleware/auth.js');
 const { asyncHandler } = require('../utils/errorHandler.js');
 const UserService = require('../services/userService.js');
+const EmailService = require('../services/emailService.js');
 
 const router = express.Router();
+const emailService = new EmailService();
 
 // GET /api/users - Récupérer tous les utilisateurs (admin seulement)
 router.get('/', authenticateUser, requireAdmin, asyncHandler(async (req, res) => {
@@ -169,6 +171,17 @@ router.put('/profile/me', authenticateUser, asyncHandler(async (req, res) => {
     delete updateData.password;
     delete updateData.role;
     
+    // Valider les données
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Aucune donnée à mettre à jour',
+          code: 'NO_DATA'
+        }
+      });
+    }
+    
     const updatedUser = await UserService.updateProfile(req.user.id, updateData);
     
     if (!updatedUser) {
@@ -194,7 +207,7 @@ router.put('/profile/me', authenticateUser, asyncHandler(async (req, res) => {
     res.status(500).json({
       success: false,
       error: {
-        message: 'Erreur lors de la mise à jour du profil',
+        message: 'Erreur lors de la mise à jour du profil: ' + error.message,
         code: 'INTERNAL_ERROR'
       }
     });
@@ -203,10 +216,15 @@ router.put('/profile/me', authenticateUser, asyncHandler(async (req, res) => {
 
 // PUT /api/users/profile/me/password - Changer le mot de passe de l'utilisateur connecté
 router.put('/profile/me/password', authenticateUser, asyncHandler(async (req, res) => {
+  console.log('🔑 PUT /profile/me/password - Requête reçue');
+  console.log('🔑 Utilisateur:', req.user.username, 'ID:', req.user.id);
+  console.log('🔑 Body reçu:', JSON.stringify(req.body, null, 2));
+  
   const { currentPassword, newPassword } = req.body;
   
   try {
     if (!currentPassword || !newPassword) {
+      console.log('❌ Données manquantes - currentPassword:', !!currentPassword, 'newPassword:', !!newPassword);
       return res.status(400).json({
         success: false,
         error: {
@@ -217,6 +235,7 @@ router.put('/profile/me/password', authenticateUser, asyncHandler(async (req, re
     }
 
     if (newPassword.length < 6) {
+      console.log('❌ Mot de passe trop court:', newPassword.length);
       return res.status(400).json({
         success: false,
         error: {
@@ -226,9 +245,12 @@ router.put('/profile/me/password', authenticateUser, asyncHandler(async (req, re
       });
     }
 
+    console.log('🔑 Appel de UserService.changePassword...');
     const result = await UserService.changePassword(req.user.id, currentPassword, newPassword);
+    console.log('🔑 Résultat de changePassword:', result);
     
     if (!result.success) {
+      console.log('❌ Échec du changement de mot de passe:', result.message);
       return res.status(400).json({
         success: false,
         error: {
@@ -238,16 +260,27 @@ router.put('/profile/me/password', authenticateUser, asyncHandler(async (req, re
       });
     }
     
+    // Envoyer email de notification de changement de mot de passe
+    try {
+      const user = await UserService.getUserById(req.user.id);
+      await emailService.sendPasswordChangedNotification(user);
+      console.log('📧 Email de notification de changement de mot de passe envoyé');
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de l\'email de notification:', emailError);
+      // Ne pas faire échouer la requête si l'email échoue
+    }
+    
+    console.log('✅ Mot de passe modifié avec succès');
     res.json({
       success: true,
       message: 'Mot de passe modifié avec succès'
     });
   } catch (error) {
-    console.error('Erreur lors du changement de mot de passe:', error);
+    console.error('❌ Erreur lors du changement de mot de passe:', error);
     res.status(500).json({
       success: false,
       error: {
-        message: 'Erreur lors du changement de mot de passe',
+        message: 'Erreur lors du changement de mot de passe: ' + error.message,
         code: 'INTERNAL_ERROR'
       }
     });
@@ -303,10 +336,14 @@ router.put('/profile/me/avatar', authenticateUser, asyncHandler(async (req, res)
 
 // DELETE /api/users/profile/me - Supprimer le compte de l'utilisateur connecté
 router.delete('/profile/me', authenticateUser, asyncHandler(async (req, res) => {
+  console.log('🔍 DELETE /profile/me - Body reçu:', JSON.stringify(req.body, null, 2));
+  console.log('🔍 Utilisateur:', req.user.username, 'ID:', req.user.id);
+  
   const { password, confirmDelete } = req.body;
   
   try {
     if (!password || !confirmDelete) {
+      console.log('❌ Données manquantes - password:', !!password, 'confirmDelete:', !!confirmDelete);
       return res.status(400).json({
         success: false,
         error: {
@@ -338,21 +375,44 @@ router.delete('/profile/me', authenticateUser, asyncHandler(async (req, res) => 
       });
     }
 
-    const bcrypt = require('bcrypt');
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Mot de passe incorrect',
-          code: 'INVALID_PASSWORD'
-        }
-      });
+    // Vérifier que l'utilisateur a un mot de passe (comptes Google n'en ont pas)
+    if (user.password) {
+      const bcrypt = require('bcrypt');
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Mot de passe incorrect',
+            code: 'INVALID_PASSWORD'
+          }
+        });
+      }
     }
 
-    // Supprimer le compte
-    await UserService.deleteUser(req.user.id);
+    // Envoyer email de notification AVANT la suppression
+    try {
+      await emailService.sendAccountDeletedByUserNotification(user);
+      console.log('📧 Email de notification de suppression envoyé');
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de l\'email de notification:', emailError);
+      // Ne pas faire échouer la requête si l'email échoue
+    }
     
+    // Supprimer le compte
+    console.log('🗑️ Suppression du compte utilisateur:', req.user.id);
+    await UserService.deleteUser(req.user.id);
+    console.log('✅ Compte supprimé de la base de données');
+    
+    // Détruire la session
+    const { destroySession } = require('../middleware/auth.js');
+    const sessionId = req.cookies?.sessionId || req.headers['x-session-id'];
+    if (sessionId) {
+      console.log('🗑️ Destruction de la session:', sessionId);
+      await destroySession(sessionId);
+    }
+    
+    console.log('✅ Suppression complète réussie');
     res.json({
       success: true,
       message: 'Compte supprimé avec succès'
@@ -362,7 +422,7 @@ router.delete('/profile/me', authenticateUser, asyncHandler(async (req, res) => 
     res.status(500).json({
       success: false,
       error: {
-        message: 'Erreur lors de la suppression du compte',
+        message: 'Erreur lors de la suppression du compte: ' + error.message,
         code: 'INTERNAL_ERROR'
       }
     });

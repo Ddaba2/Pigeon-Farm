@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Plus, Search, Filter, Edit, Trash2, Calendar, Clock, X } from 'lucide-react';
 import apiService from '../utils/api';
 import ConfirmationModal from './ConfirmationModal';
+import { formatDateForInput } from '../utils/dateUtils';
 
 interface Egg {
   id: number;
@@ -130,13 +131,6 @@ const EggTracking: React.FC = () => {
 
   const handleEdit = (egg: Egg) => {
     setEditingEgg(egg);
-    
-    // Convertir les dates ISO en format yyyy-MM-dd pour les champs date
-    const formatDateForInput = (dateString: string) => {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      return date.toISOString().split('T')[0];
-    };
     
     // Vérifier que les données essentielles sont présentes
     if (!egg.coupleId || !egg.egg1Date) {

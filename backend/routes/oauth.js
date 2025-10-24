@@ -6,11 +6,30 @@ const { asyncHandler } = require('../utils/errorHandler');
 const router = express.Router();
 
 // Route d'initiation Google OAuth
-router.get('/google', 
+router.get('/google', (req, res, next) => {
+    // Vérifier si Google OAuth est configuré
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return res.status(501).json({
+            success: false,
+            error: {
+                message: 'Google OAuth non configuré - Variables d\'environnement manquantes',
+                code: 'OAUTH_NOT_CONFIGURED',
+                details: {
+                    required: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
+                    missing: [
+                        !process.env.GOOGLE_CLIENT_ID ? 'GOOGLE_CLIENT_ID' : null,
+                        !process.env.GOOGLE_CLIENT_SECRET ? 'GOOGLE_CLIENT_SECRET' : null
+                    ].filter(Boolean)
+                }
+            }
+        });
+    }
+    
+    // Utiliser la stratégie Google OAuth si elle est configurée
     passport.authenticate('google', { 
         scope: ['profile', 'email'] 
-    })
-);
+    })(req, res, next);
+});
 
 // Callback Google OAuth
 router.get('/google/callback', 
@@ -29,7 +48,7 @@ router.get('/google/callback',
             console.log('✅ OAuth Google réussi pour:', user.username);
 
             // Créer une session pour l'utilisateur
-            const sessionId = createSession(user);
+            const sessionId = await createSession(user);
             
             // Définir le cookie de session
             res.cookie('sessionId', sessionId, {
@@ -126,7 +145,7 @@ router.get('/test', (req, res) => {
             status: '/api/oauth/status'
         },
         config: {
-            clientId: process.env.GOOGLE_CLIENT_ID ? 'Configuré' : 'Manquant',
+            googleClientId: process.env.GOOGLE_CLIENT_ID ? 'Configuré' : 'Manquant',
             redirectUri: process.env.GOOGLE_REDIRECT_URI,
             frontendSuccessUri: process.env.FRONTEND_SUCCESS_URI,
             frontendErrorUri: process.env.FRONTEND_ERROR_URI

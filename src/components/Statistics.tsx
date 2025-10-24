@@ -3,6 +3,7 @@ import { TrendingUp, BarChart3, PieChart, Calendar, Plus, Edit, Trash2, DollarSi
 import apiService from '../utils/api';
 import pdfExporter from '../utils/pdfExport';
 import ConfirmationModal from './ConfirmationModal';
+import { formatDateForInput } from '../utils/dateUtils';
 
 interface Sale {
   id: number;
@@ -13,7 +14,7 @@ interface Sale {
   quantity: number;
   unitPrice: number;
   totalAmount: number;
-  paymentMethod: 'virement' | 'espece' | 'cheque' | 'mobile_money';
+  paymentMethod: 'virement' | 'espece' | 'cheque' | 'mobile_money' | 'credit';
   date: string;
   observations?: string;
 }
@@ -51,6 +52,7 @@ const Statistics: React.FC = () => {
   });
 
   const [sales, setSales] = useState<Sale[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [confirmationModal, setConfirmationModal] = useState<{ isOpen: boolean; saleId: number | null }>({
@@ -72,7 +74,8 @@ const Statistics: React.FC = () => {
   useEffect(() => {
     const loadStatistics = async () => {
       try {
-        const response = await apiService.getDashboardStats();
+        setLoading(true);
+        const response = await apiService.getDashboardStats() as any;
         if (response.success && response.data) {
           console.log('🔍 Données statistiques reçues:', response.data);
           setStats({
@@ -96,29 +99,36 @@ const Statistics: React.FC = () => {
             },
             health: {
               total: response.data.totalHealthRecords || 0,
-              vaccinations: response.data.totalHealthRecords || 0, // Pour l'instant, tout comme vaccinations
-              treatments: 0,
-              exams: 0
+              vaccinations: response.data.healthByType?.find((h: any) => h.type === 'vaccination')?.count || 0,
+              treatments: response.data.healthByType?.find((h: any) => h.type === 'traitement')?.count || 0,
+              exams: response.data.healthByType?.find((h: any) => h.type === 'exam' || h.type === 'examen')?.count || 0
             },
             sales: {
-              total: 0, // À calculer depuis les ventes
-              totalRevenue: 0
+              total: response.data.totalSales || 0,
+              totalRevenue: parseFloat(response.data.totalRevenue || '0')
             }
           });
+        } else {
+          console.log('❌ Échec du chargement des statistiques:', response);
         }
-    } catch (error) {
-      // Erreur chargement statistiques ignorée
+      } catch (error) {
+        console.error('❌ Erreur lors du chargement des statistiques:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     const loadSales = async () => {
       try {
-        const response = await apiService.get('/sales');
+        const response = await apiService.get('/sales') as any;
         if (response.success && response.data) {
           setSales(response.data);
+          console.log('🔍 Ventes chargées:', response.data.length);
+        } else {
+          console.log('❌ Échec du chargement des ventes:', response);
         }
       } catch (error) {
-        // Erreur chargement ventes ignorée
+        console.error('❌ Erreur lors du chargement des ventes:', error);
       }
     };
 
@@ -179,7 +189,7 @@ const Statistics: React.FC = () => {
 
       if (editingSale) {
         // Modification
-        const response = await apiService.put(`/sales/${editingSale.id}`, backendData);
+        const response = await apiService.put(`/sales/${editingSale.id}`, backendData) as any;
         if (response.success) {
           setSales(sales.map(s => 
             s.id === editingSale.id 
@@ -189,7 +199,7 @@ const Statistics: React.FC = () => {
         }
       } else {
         // Ajout
-        const response = await apiService.post('/sales', backendData);
+        const response = await apiService.post('/sales', backendData) as any;
         if (response.success) {
           setSales([...sales, response.data]);
         }
@@ -199,7 +209,7 @@ const Statistics: React.FC = () => {
       setEditingSale(null);
       resetForm();
     } catch (error) {
-      // Erreur sauvegarde ignorée
+      console.error('Erreur lors de la sauvegarde de la vente:', error);
       alert('Erreur lors de la sauvegarde de la vente');
     }
   };
@@ -207,13 +217,13 @@ const Statistics: React.FC = () => {
      const handleEdit = (sale: Sale) => {
      setEditingSale(sale);
      setFormData({
-       targetType: sale.targetType,
+       targetType: sale.targetType as any,
        targetId: sale.targetId || '',
        buyerName: sale.buyerName || '',
        quantity: sale.quantity.toString(),
        unitPrice: sale.unitPrice.toString(),
-       paymentMethod: sale.paymentMethod || 'espece',
-       date: formatDateForInput(sale.date),
+       paymentMethod: sale.paymentMethod as any || 'espece',
+       date: sale.date.split('T')[0],
        observations: sale.observations || ''
      });
      setShowModal(true);
@@ -226,25 +236,18 @@ const Statistics: React.FC = () => {
   const confirmDelete = async () => {
     if (confirmationModal.saleId) {
       try {
-        const response = await apiService.delete(`/sales/${confirmationModal.saleId}`);
+        const response = await apiService.delete(`/sales/${confirmationModal.saleId}`) as any;
         if (response.success) {
           setSales(sales.filter(s => s.id !== confirmationModal.saleId));
         }
       } catch (error) {
-        // Erreur suppression ignorée
+        console.error('Erreur lors de la suppression de la vente:', error);
         alert('Erreur lors de la suppression de la vente');
       }
     }
     setConfirmationModal({ isOpen: false, saleId: null });
   };
 
-  const formatDateForInput = (dateString: string) => {
-    if (!dateString) return new Date().toISOString().split('T')[0];
-    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      return dateString;
-    }
-    return new Date(dateString).toISOString().split('T')[0];
-  };
 
      const resetForm = () => {
      setFormData({
@@ -259,9 +262,34 @@ const Statistics: React.FC = () => {
      });
    };
 
+  // Calculer le prix total automatiquement
+  const calculateTotalPrice = () => {
+    const quantity = parseFloat(formData.quantity) || 0;
+    const unitPrice = parseFloat(formData.unitPrice) || 0;
+    return quantity * unitPrice;
+  };
+
+  // Mettre à jour les champs de quantité ou prix unitaire
+  const handleQuantityChange = (value: string) => {
+    setFormData(prev => ({ ...prev, quantity: value }));
+  };
+
+  const handleUnitPriceChange = (value: string) => {
+    setFormData(prev => ({ ...prev, unitPrice: value }));
+  };
+
   const handleExportPDF = async () => {
     await pdfExporter.exportStatistics(stats, sales);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600 dark:text-gray-400">Chargement des statistiques...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -340,6 +368,23 @@ const Statistics: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Message informatif si pas de données */}
+      {stats.couples.total === 0 && stats.eggs.total === 0 && stats.pigeonneaux.total === 0 && stats.health.total === 0 && stats.sales.total === 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-6 text-center">
+          <div className="text-blue-600 dark:text-blue-400 mb-2">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
+            Aucune donnée disponible
+          </h3>
+          <p className="text-blue-700 dark:text-blue-300">
+            Commencez par ajouter des couples, des œufs ou des pigeonneaux pour voir vos statistiques.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
@@ -589,7 +634,7 @@ const Statistics: React.FC = () => {
                     type="number"
                     required
                     value={formData.quantity}
-                    onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                    onChange={(e) => handleQuantityChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white"
                     placeholder="Ex: 1"
                     min="1"
@@ -605,7 +650,7 @@ const Statistics: React.FC = () => {
                     type="number"
                     required
                     value={formData.unitPrice}
-                    onChange={(e) => setFormData({...formData, unitPrice: e.target.value})}
+                    onChange={(e) => handleUnitPriceChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white"
                     placeholder="Ex: 50000"
                     min="0"
@@ -618,12 +663,7 @@ const Statistics: React.FC = () => {
                     Montant total (XOF)
                   </label>
                   <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white font-medium">
-                    {(() => {
-                      const quantity = parseInt(formData.quantity) || 0;
-                      const unitPrice = parseFloat(formData.unitPrice) || 0;
-                      const total = quantity * unitPrice;
-                      return total.toLocaleString('fr-FR');
-                    })()} XOF
+                    {calculateTotalPrice().toLocaleString('fr-FR')} XOF
                   </div>
                 </div>
               </div>

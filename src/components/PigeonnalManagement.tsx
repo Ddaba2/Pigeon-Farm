@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Activity, Plus, Search, Filter, Edit, Trash2, X } from 'lucide-react';
 import apiService from '../utils/api';
 import ConfirmationModal from './ConfirmationModal';
+import { formatDateForInput } from '../utils/dateUtils';
 
 interface Pigeonneau {
   id: number;
@@ -10,7 +11,7 @@ interface Pigeonneau {
   birthDate: string;
   sex: 'male' | 'female' | 'unknown';
   weight: number;
-  status: 'active' | 'sold' | 'deceased';
+  status: 'alive' | 'sold' | 'dead';
   salePrice?: number;
   observations?: string;
 }
@@ -58,7 +59,7 @@ const PigeonnalManagement: React.FC = () => {
     birthDate: new Date().toISOString().split('T')[0],
     sex: 'unknown' as const,
     weight: '',
-    status: 'active' as const,
+    status: 'alive' as const,
     salePrice: '',
     observations: ''
   });
@@ -90,22 +91,25 @@ const PigeonnalManagement: React.FC = () => {
       }
 
       // Transformer les données pour le backend
-      const backendData = {
+      // Préparer les données pour le backend
+      const backendData: any = {
         coupleId: parseInt(formData.coupleId),
-        eggRecordId: null, // Pour l'instant, on peut laisser null
         birthDate: formData.birthDate,
         sex: formData.sex,
-        weight: formData.weight ? parseFloat(formData.weight) : null,
-        weaningDate: null, // Optionnel
         status: formData.status,
-        salePrice: formData.salePrice ? parseFloat(formData.salePrice) : null,
-        saleDate: null, // Optionnel
-        buyer: null, // Optionnel
         observations: formData.observations
       };
 
+      // Ajouter les champs optionnels seulement s'ils ont une valeur
+      if (formData.weight) {
+        backendData.weight = parseFloat(formData.weight);
+      }
+      if (formData.salePrice) {
+        backendData.salePrice = parseFloat(formData.salePrice);
+      }
+
       if (editingPigeonneau) {
-        // Modification
+        // Modification - ne pas envoyer eggRecordId pour éviter l'erreur SQL
         const response = await apiService.updatePigeonneau(editingPigeonneau.id, backendData);
         if (response.success) {
           setPigeonneaux(pigeonneaux.map(p => 
@@ -114,22 +118,32 @@ const PigeonnalManagement: React.FC = () => {
               : p
           ));
           showNotification('success', 'Pigeonneau modifié avec succès');
+          setShowModal(false);
+          setEditingPigeonneau(null);
+          resetForm();
+        } else {
+          showNotification('error', response.error || 'Erreur lors de la modification du pigeonneau');
         }
       } else {
-        // Ajout
-        const response = await apiService.createPigeonneau(backendData);
+        // Ajout - ajouter eggRecordId pour la création
+        const createData = {
+          ...backendData,
+          eggRecordId: null // La création gérait déjà l'eggRecordId
+        };
+        const response = await apiService.createPigeonneau(createData);
         if (response.success) {
           setPigeonneaux([...pigeonneaux, response.data]);
           showNotification('success', 'Pigeonneau créé avec succès');
+          setShowModal(false);
+          setEditingPigeonneau(null);
+          resetForm();
+        } else {
+          showNotification('error', response.error || 'Erreur lors de la création du pigeonneau');
         }
       }
-      
-      setShowModal(false);
-      setEditingPigeonneau(null);
-      resetForm();
-    } catch (error) {
-      // console.error('Erreur lors de la sauvegarde:', error);
-      showNotification('error', 'Erreur lors de la sauvegarde du pigeonneau');
+    } catch (error: any) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      showNotification('error', error.response?.data?.error || 'Erreur lors de la sauvegarde du pigeonneau');
     }
   };
 
@@ -137,7 +151,7 @@ const PigeonnalManagement: React.FC = () => {
     setEditingPigeonneau(pigeonneau);
     setFormData({
       coupleId: pigeonneau.coupleId.toString(),
-      birthDate: pigeonneau.birthDate,
+      birthDate: formatDateForInput(pigeonneau.birthDate),
       sex: pigeonneau.sex,
       weight: pigeonneau.weight?.toString() || '',
       status: pigeonneau.status,
@@ -158,10 +172,12 @@ const PigeonnalManagement: React.FC = () => {
         if (response.success) {
           setPigeonneaux(pigeonneaux.filter(p => p.id !== confirmationModal.pigeonneauId));
           showNotification('success', 'Pigeonneau supprimé avec succès');
+        } else {
+          showNotification('error', response.error || 'Erreur lors de la suppression du pigeonneau');
         }
-      } catch (error) {
-        // console.error('Erreur lors de la suppression:', error);
-        showNotification('error', 'Erreur lors de la suppression du pigeonneau');
+      } catch (error: any) {
+        console.error('Erreur lors de la suppression:', error);
+        showNotification('error', error.response?.data?.error || 'Erreur lors de la suppression du pigeonneau');
       }
     }
     setConfirmationModal({ isOpen: false, pigeonneauId: null });
@@ -173,7 +189,7 @@ const PigeonnalManagement: React.FC = () => {
       birthDate: new Date().toISOString().split('T')[0],
       sex: 'unknown',
       weight: '',
-      status: 'active',
+      status: 'alive',
       salePrice: '',
       observations: ''
     });
@@ -187,9 +203,9 @@ const PigeonnalManagement: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'alive': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
       case 'sold': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'deceased': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      case 'dead': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
   };
@@ -269,7 +285,7 @@ const PigeonnalManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(pigeonneau.status)}`}>
-                      {pigeonneau.status === 'active' ? 'Actif' : pigeonneau.status === 'sold' ? 'Vendu' : 'Décédé'}
+                      {pigeonneau.status === 'alive' ? 'Actif' : pigeonneau.status === 'sold' ? 'Vendu' : 'Décédé'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -377,9 +393,9 @@ const PigeonnalManagement: React.FC = () => {
                     onChange={(e) => setFormData({...formData, status: e.target.value as any})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
                   >
-                    <option value="active">Actif</option>
+                    <option value="alive">Actif</option>
                     <option value="sold">Vendu</option>
-                    <option value="deceased">Décédé</option>
+                    <option value="dead">Décédé</option>
                   </select>
               </div>
 

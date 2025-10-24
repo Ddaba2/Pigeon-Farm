@@ -15,6 +15,7 @@ import AdminPanel from './components/AdminPanel';
 import Notifications from './components/Notifications';
 import ErrorBoundary from './components/ErrorBoundary';
 import AccessibilityPanel from './components/AccessibilityPanel';
+import Base64Image from './components/Base64Image';
 import { User } from './types/types';
 import { useDarkMode } from './hooks/useDarkMode';
 import { edgeLocalStorage } from './utils/storageManager';
@@ -31,20 +32,66 @@ function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
 
   useEffect(() => {
-    const userData = edgeLocalStorage.getItem('user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        setUser(user);
-        // Si l'utilisateur est admin, ouvrir directement l'interface admin
-        if (user.role === 'admin') {
-          setShowAdminPanel(true);
+    const checkUserSession = async () => {
+      const userData = edgeLocalStorage.getItem('user');
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          
+          // Vérifier si la session est encore valide
+          try {
+            const sessionId = edgeLocalStorage.getItem('sessionId');
+            if (!sessionId) {
+              // Pas de sessionId, déconnecter
+              edgeLocalStorage.removeItem('user');
+              setUser(null);
+              return;
+            }
+            
+            const response = await fetch('http://localhost:3002/api/auth/verify-session', {
+              method: 'GET',
+              headers: {
+                'x-session-id': sessionId,
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include'
+            });
+            
+            if (response.ok) {
+              const sessionData = await response.json();
+              if (sessionData.success && sessionData.user) {
+                setUser(sessionData.user);
+                // Si l'utilisateur est admin, ouvrir directement l'interface admin
+                if (sessionData.user.role === 'admin') {
+                  setShowAdminPanel(true);
+                }
+              } else {
+                // Session invalide, déconnecter
+                edgeLocalStorage.removeItem('user');
+                edgeLocalStorage.removeItem('sessionId');
+                setUser(null);
+              }
+            } else {
+              // Session expirée, déconnecter
+              edgeLocalStorage.removeItem('user');
+              edgeLocalStorage.removeItem('sessionId');
+              setUser(null);
+            }
+          } catch (error) {
+            console.error('Erreur lors de la vérification de session:', error);
+            // En cas d'erreur réseau, garder l'utilisateur connecté mais afficher un avertissement
+            console.warn('Impossible de vérifier la session, maintien de la connexion locale');
+            // Ne pas déconnecter automatiquement en cas d'erreur réseau
+          }
+        } catch (error) {
+          // Erreur de parsing, nettoyer
+          edgeLocalStorage.removeItem('user');
+          edgeLocalStorage.removeItem('sessionId');
         }
-      } catch (error) {
-        // console.error('Erreur lors du parsing des données utilisateur:', error);
-        edgeLocalStorage.removeItem('user');
       }
-    }
+    };
+    
+    checkUserSession();
   }, []);
 
   // Charger le nombre de notifications non lues
@@ -58,16 +105,31 @@ function App() {
       }
     } catch (error) {
       console.error('Erreur lors du chargement du nombre de notifications:', error);
+      // Si erreur d'authentification, déconnecter l'utilisateur
+      if (error.message === 'Authentification requise') {
+        edgeLocalStorage.removeItem('user');
+        edgeLocalStorage.removeItem('sessionId');
+        setUser(null);
+        setShowAdminPanel(false);
+      }
     }
   };
 
   // Charger le nombre de notifications quand l'utilisateur se connecte
   useEffect(() => {
-    if (user) {
-      loadNotificationCount();
-      // Recharger toutes les 30 secondes
-      const interval = setInterval(loadNotificationCount, 30000);
-      return () => clearInterval(interval);
+    if (user && user.id) {
+      // Délai pour s'assurer que la session est bien établie
+      const timer = setTimeout(() => {
+        loadNotificationCount();
+      }, 1000);
+      
+      // Recharger toutes les 5 minutes (300000ms) pour éviter le rate limiting
+      const interval = setInterval(loadNotificationCount, 300000);
+      
+      return () => {
+        clearTimeout(timer);
+        clearInterval(interval);
+      };
     }
   }, [user]);
 
@@ -83,11 +145,27 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
-    edgeLocalStorage.removeItem('user');
-    setUser(null);
-    setActiveTab('dashboard');
-    setShowAdminPanel(false);
+  const handleLogout = async () => {
+    try {
+      // Appeler l'API de déconnexion
+      await fetch('http://localhost:3002/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    } finally {
+      // Nettoyer le stockage local
+      edgeLocalStorage.removeItem('user');
+      edgeLocalStorage.removeItem('sessionId');
+      setUser(null);
+      setActiveTab('dashboard');
+      setShowAdminPanel(false);
+      setNotificationCount(0);
+    }
   };
 
   // Les routes OAuth sont maintenant gérées par React Router dans main.tsx
@@ -193,14 +271,10 @@ function App() {
                     >
                       <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 border-2 border-gray-300">
                         {user.avatar_url ? (
-                          <img
+                          <Base64Image
                             src={user.avatar_url}
                             alt="Avatar"
                             className="h-full w-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                            }}
                           />
                         ) : null}
                         <div className={`h-full w-full flex items-center justify-center ${user.avatar_url ? 'hidden' : ''}`}>

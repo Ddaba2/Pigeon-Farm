@@ -6,6 +6,7 @@ class ApiService {
   private baseURL: string;
 
   constructor() {
+    // Use the correct backend port
     this.baseURL = 'http://localhost:3002/api';
   }
 
@@ -56,6 +57,13 @@ class ApiService {
       
       if (!response.ok) {
         if (response.status === 401) {
+          // Nettoyer les données de session en cas d'erreur 401
+          try {
+            edgeLocalStorage.removeItem('user');
+            edgeLocalStorage.removeItem('sessionId');
+          } catch (error) {
+            // Erreur de nettoyage ignorée
+          }
           throw new Error('Authentification requise');
         }
         throw new Error(`Erreur de requête: ${response.status}`);
@@ -220,10 +228,16 @@ class ApiService {
     });
   }
 
-  async delete<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, {
+  async delete<T>(endpoint: string, data?: any): Promise<T> {
+    const options: RequestInit = {
       method: 'DELETE',
-    });
+    };
+    
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    
+    return this.request<T>(endpoint, options);
   }
 
   // Méthodes spécifiques pour le tableau de bord
@@ -544,6 +558,33 @@ export const deleteReadNotifications = async () => {
 // Créer une notification (admin seulement)
 export const createNotification = async (userId: number, title: string, message: string, type = 'info') => {
   return apiService.post('/notifications', { userId, title, message, type });
+};
+
+// ========== ALERTES UNIFIÉES ==========
+
+// Récupérer les alertes pour l'utilisateur connecté
+export const getUserAlerts = async () => {
+  return apiService.get('/alerts/user');
+};
+
+// Exécuter l'analyse globale des alertes (admin seulement)
+export const runGlobalAlerts = async () => {
+  return apiService.get('/alerts/global');
+};
+
+// Exécuter les vérifications d'alertes (admin seulement)
+export const runAlerts = async () => {
+  return apiService.get('/alerts/run');
+};
+
+// Créer une alerte personnalisée
+export const createCustomAlert = async (title: string, message: string, type = 'info', targetUserId?: number) => {
+  return apiService.post('/alerts/custom', { title, message, type, targetUserId });
+};
+
+// Tester les alertes (admin seulement)
+export const testAlerts = async () => {
+  return apiService.get('/alerts/test');
 };
 
 // ========== EXPORT DU SERVICE ==========

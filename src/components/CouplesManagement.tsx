@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Search, Filter, Edit, Trash2, Eye } from 'lucide-react';
 import apiService from '../utils/api';
 import ConfirmationModal from './ConfirmationModal';
+import { formatDateForInput } from '../utils/dateUtils';
 
 interface Couple {
   id: number;
@@ -96,13 +97,6 @@ const CouplesManagement: React.FC = () => {
 
   const handleEdit = (couple: Couple) => {
     setEditingCouple(couple);
-    
-    // Convertir la date ISO en format yyyy-MM-dd pour le champ date
-    const formatDateForInput = (dateString: string) => {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      return date.toISOString().split('T')[0];
-    };
     
     setFormData({
       name: couple.name || '', // nestNumber from backend
