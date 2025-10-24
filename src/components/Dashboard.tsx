@@ -55,6 +55,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     };
 
     loadDashboardData();
+    
+    // Rafraîchir les données toutes les 30 secondes
+    const interval = setInterval(loadDashboardData, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const getIcon = (iconName: string) => {

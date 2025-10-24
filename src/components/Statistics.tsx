@@ -134,6 +134,14 @@ const Statistics: React.FC = () => {
 
     loadStatistics();
     loadSales();
+    
+    // Rafraîchir les données toutes les 30 secondes
+    const interval = setInterval(() => {
+      loadStatistics();
+      loadSales();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
