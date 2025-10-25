@@ -2,7 +2,7 @@ const { executeQuery } = require('../config/database');
 
 class HealthService {
   // Récupérer tous les enregistrements de santé
-  async getAllHealthRecords() {
+  async getAllHealthRecords(userId) {
     try {
       const rows = await executeQuery(`
         SELECT 
@@ -24,8 +24,9 @@ class HealthService {
         FROM healthRecords h
         LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
         LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
+        WHERE h.user_id = ?
         ORDER BY h.created_at DESC
-      `);
+      `, [userId]);
       console.log('🔍 HealthService.getAllHealthRecords - Nombre d\'enregistrements:', rows.length);
       return rows;
     } catch (error) {
@@ -66,7 +67,7 @@ class HealthService {
   }
 
   // Créer un nouvel enregistrement de santé
-  async createHealthRecord(healthData) {
+  async createHealthRecord(healthData, userId) {
     try {
       const { 
         type, 
@@ -79,11 +80,12 @@ class HealthService {
       } = healthData;
       
       console.log('🔍 HealthService.createHealthRecord - Données:', JSON.stringify(healthData, null, 2));
+      console.log('🔍 HealthService.createHealthRecord - User ID:', userId);
       
       const result = await executeQuery(`
-        INSERT INTO healthRecords (type, targetType, targetId, product, date, nextDue, observations, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `, [type, targetType, targetId, product, date, nextDue, observations]);
+        INSERT INTO healthRecords (user_id, type, targetType, targetId, product, date, nextDue, observations, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `, [userId, type, targetType, targetId, product, date, nextDue, observations]);
       
       console.log('✅ HealthService.createHealthRecord - Résultat:', result.insertId);
       

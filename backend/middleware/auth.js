@@ -64,8 +64,8 @@ const createSession = async (user) => {
       email: user.email,
       role: user.role,
       status: user.status,
-      full_name: user.full_name,
-      avatar_url: user.avatar_url
+      full_name: user.full_name || user.fullName || user.displayName || '',
+      avatar_url: user.avatar_url || user.avatarUrl || null
     },
     createdAt: Date.now()
   };
@@ -132,8 +132,8 @@ const verifySession = async (sessionId) => {
       email: updatedUser.email,
       role: updatedUser.role,
       status: updatedUser.status,
-      full_name: updatedUser.fullName,
-      avatar_url: updatedUser.avatar_url
+      full_name: updatedUser.fullName || updatedUser.full_name || '',
+      avatar_url: updatedUser.avatar_url || updatedUser.avatarUrl || null
     };
     
     activeSessions.set(sessionId, session);

@@ -12,7 +12,8 @@
     "verify:setup": "node verify-setup.js",
     "users:list": "node list-users.js",
     "users:clear": "node clear-test-users.js",
-    "users:delete": "node delete-user.js"
+    "users:delete": "node delete-user.js",
+    "migrate:health": "node migrate-health-records.js"
   },
   "keywords": [
     "pigeon",

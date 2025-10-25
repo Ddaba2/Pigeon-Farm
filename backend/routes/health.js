@@ -55,33 +55,8 @@ router.get('/', authenticateUser, async (req, res) => {
   try {
     console.log('🔍 GET /health - Utilisateur:', req.user.username, 'ID:', req.user.id);
     
-    // Récupérer TOUS les enregistrements de santé de l'utilisateur connecté
-    // sans filtrer par couple car l'utilisateur peut ajouter des health records sans couple spécifique
-    const { executeQuery } = require('../config/database');
-    const records = await executeQuery(`
-      SELECT DISTINCT 
-        h.id,
-        h.type,
-        h.targetType,
-        h.targetId,
-        h.product,
-        h.date,
-        h.nextDue,
-        h.observations,
-        h.created_at,
-        h.updated_at,
-        CASE 
-          WHEN h.targetType = 'couple' AND c.id IS NOT NULL THEN c.nestNumber
-          WHEN h.targetType = 'pigeonneau' AND p.id IS NOT NULL THEN CONCAT('Pigeonneau #', p.id)
-          WHEN h.targetType = 'couple' THEN CONCAT('Couple #', h.targetId)
-          WHEN h.targetType = 'pigeonneau' THEN CONCAT('Pigeonneau #', h.targetId)
-          ELSE 'Non spécifié'
-        END as targetName
-      FROM healthRecords h
-      LEFT JOIN couples c ON h.targetType = 'couple' AND h.targetId = c.id
-      LEFT JOIN pigeonneaux p ON h.targetType = 'pigeonneau' AND h.targetId = p.id
-      ORDER BY h.created_at DESC
-    `);
+    // Récupérer tous les enregistrements de santé de l'utilisateur connecté SEULEMENT
+    const records = await healthService.getAllHealthRecords(req.user.id);
     
     console.log('🔍 GET /health - Nombre d\'enregistrements trouvés:', records.length);
     res.json({ success: true, data: records });
@@ -108,6 +83,7 @@ router.get('/:id', authenticateUser, async (req, res) => {
 router.post('/', authenticateUser, async (req, res) => {
   try {
     console.log('🔍 Backend - Données reçues:', JSON.stringify(req.body, null, 2));
+    console.log('🔍 Backend - User ID:', req.user.id);
     
     const validation = validateHealthRecord(req.body);
     console.log('🔍 Backend - Validation:', validation);
@@ -117,7 +93,7 @@ router.post('/', authenticateUser, async (req, res) => {
       return res.status(400).json({ success: false, error: validation.errors.join(', ') });
     }
 
-    const newRecord = await healthService.createHealthRecord(req.body);
+    const newRecord = await healthService.createHealthRecord(req.body, req.user.id);
     res.status(201).json({ success: true, data: newRecord });
   } catch (error) {
     console.log('❌ Backend - Erreur:', error.message);

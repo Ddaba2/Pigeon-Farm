@@ -3,8 +3,13 @@
 -- =====================================================
 -- Version mise à jour avec les corrections apportées :
 -- - Ajout de la colonne user_id dans la table sales
+-- - Ajout de la colonne user_id dans la table healthrecords
+-- - Ajout de la colonne payment_method dans la table sales
+-- - Ajout de la table sessions pour la gestion des sessions utilisateurs
 -- - Ajout des champs phone, address, bio dans la table users
 -- - Correction des contraintes de clés étrangères
+-- - Correction du type old_values et new_values en LONGTEXT dans audit_logs
+-- - Correction du nom de la table healthrecords (tout en minuscules)
 -- =====================================================
 
 -- Création de la base de données
@@ -109,8 +114,9 @@ CREATE TABLE IF NOT EXISTS pigeonneaux (
 );
 
 -- Table des enregistrements de santé
-CREATE TABLE IF NOT EXISTS healthRecords (
+CREATE TABLE IF NOT EXISTS healthrecords (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
     type VARCHAR(100) NOT NULL,
     targetType VARCHAR(50) NOT NULL,
     targetId INT,
@@ -120,6 +126,8 @@ CREATE TABLE IF NOT EXISTS healthRecords (
     observations TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
     INDEX idx_target (targetType, targetId),
     INDEX idx_type (type),
     INDEX idx_date (date),
@@ -136,6 +144,7 @@ CREATE TABLE IF NOT EXISTS sales (
     amount DECIMAL(10,2) NOT NULL,
     description VARCHAR(255),
     client VARCHAR(100),
+    payment_method VARCHAR(50) DEFAULT 'espece',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -150,12 +159,24 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL,
     code VARCHAR(4) NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     used BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_email (email),
     INDEX idx_expires_at (expires_at),
     INDEX idx_used (used)
+);
+
+-- Table des sessions utilisateurs
+CREATE TABLE IF NOT EXISTS sessions (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id INT NOT NULL,
+    data TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_expires_at (expires_at)
 );
 
 -- Table des notifications (pour futures fonctionnalités)
@@ -180,8 +201,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     action VARCHAR(100) NOT NULL,
     table_name VARCHAR(100),
     record_id INT,
-    old_values JSON,
-    new_values JSON,
+    old_values LONGTEXT,
+    new_values LONGTEXT,
     ip_address VARCHAR(45),
     user_agent TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -215,10 +236,12 @@ DESCRIBE users;
 DESCRIBE couples;
 DESCRIBE eggs;
 DESCRIBE pigeonneaux;
-DESCRIBE healthRecords;
+DESCRIBE healthrecords;
 DESCRIBE sales;
 DESCRIBE password_reset_codes;
+DESCRIBE sessions;
 DESCRIBE notifications;
+DESCRIBE user_preferences;
 DESCRIBE audit_logs;
 
 -- Affichage des données de test
@@ -230,6 +253,16 @@ SELECT 'Œufs', COUNT(*) FROM eggs
 UNION ALL
 SELECT 'Pigeonneaux', COUNT(*) FROM pigeonneaux
 UNION ALL
-SELECT 'Enregistrements de santé', COUNT(*) FROM healthRecords
+SELECT 'Enregistrements de santé', COUNT(*) FROM healthrecords
 UNION ALL
-SELECT 'Ventes', COUNT(*) FROM sales; 
+SELECT 'Ventes', COUNT(*) FROM sales
+UNION ALL
+SELECT 'Sessions', COUNT(*) FROM sessions
+UNION ALL
+SELECT 'Notifications', COUNT(*) FROM notifications
+UNION ALL
+SELECT 'Préférences utilisateur', COUNT(*) FROM user_preferences
+UNION ALL
+SELECT 'Logs d''audit', COUNT(*) FROM audit_logs
+UNION ALL
+SELECT 'Codes de réinitialisation', COUNT(*) FROM password_reset_codes; 

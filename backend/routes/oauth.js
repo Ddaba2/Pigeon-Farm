@@ -33,9 +33,26 @@ router.get('/google', (req, res, next) => {
 
 // Callback Google OAuth
 router.get('/google/callback', 
-    passport.authenticate('google', { 
-        failureRedirect: `${process.env.FRONTEND_ERROR_URI}?error=oauth_failed` 
-    }),
+    (req, res, next) => {
+        passport.authenticate('google', (err, user, info) => {
+            console.log('🔍 Callback OAuth - État:', { err: err?.message, user: user?.username, info });
+            
+            if (err) {
+                console.error('❌ Erreur Passport dans le callback:', err);
+                console.error('Stack trace:', err.stack);
+                return res.redirect(`${process.env.FRONTEND_ERROR_URI}?error=oauth_auth_failed&message=${encodeURIComponent(err.message)}`);
+            }
+            
+            if (!user) {
+                console.error('❌ Pas d\'utilisateur retourné par Passport');
+                return res.redirect(`${process.env.FRONTEND_ERROR_URI}?error=no_user_from_passport`);
+            }
+            
+            // Attacher l'utilisateur à la requête pour le handler suivant
+            req.user = user;
+            next();
+        })(req, res, next);
+    },
     asyncHandler(async (req, res) => {
         try {
             const user = req.user;
@@ -45,7 +62,22 @@ router.get('/google/callback',
                 return res.redirect(`${process.env.FRONTEND_ERROR_URI}?error=no_user`);
             }
 
+            // Vérifier que les champs essentiels sont présents
+            if (!user.id || !user.username || !user.email) {
+                console.error('❌ Données utilisateur incomplètes:', user);
+                return res.redirect(`${process.env.FRONTEND_ERROR_URI}?error=incomplete_user_data`);
+            }
+
             console.log('✅ OAuth Google réussi pour:', user.username);
+            console.log('📋 Données utilisateur reçues:', {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName,
+                full_name: user.full_name,
+                role: user.role,
+                avatar_url: user.avatar_url
+            });
 
             // Créer une session pour l'utilisateur
             const sessionId = await createSession(user);
@@ -64,9 +96,9 @@ router.get('/google/callback',
                 id: user.id,
                 username: user.username,
                 email: user.email,
-                fullName: user.fullName,
+                fullName: user.fullName || user.full_name || user.displayName || '',
                 role: user.role,
-                avatar_url: user.avatar_url,
+                avatar_url: user.avatar_url || user.avatarUrl || null,
                 google_id: user.google_id
             };
 
@@ -79,7 +111,8 @@ router.get('/google/callback',
 
         } catch (error) {
             console.error('❌ Erreur dans le callback OAuth:', error);
-            res.redirect(`${process.env.FRONTEND_ERROR_URI}?error=callback_error`);
+            console.error('Stack trace:', error.stack);
+            res.redirect(`${process.env.FRONTEND_ERROR_URI}?error=callback_error&message=${encodeURIComponent(error.message)}`);
         }
     })
 );

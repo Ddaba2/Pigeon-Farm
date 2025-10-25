@@ -34,16 +34,21 @@ const OAuthSuccess: React.FC<OAuthSuccessProps> = ({ onAuthSuccess }) => {
             if (sessionId) {
               edgeLocalStorage.setItem('sessionId', sessionId);
             }
+            console.log('✅ Utilisateur stocké:', userData.username);
           } catch (error) {
             console.warn('Impossible de stocker les données localement:', error);
           }
         }
 
-        // Appeler le callback de succès
-        onAuthSuccess(userData, 'Connexion Google réussie !');
+        // Appeler le callback de succès si fourni
+        if (onAuthSuccess) {
+          onAuthSuccess(userData, 'Connexion Google réussie !');
+        }
 
-        // Rediriger vers l'application principale
-        window.location.href = '/';
+        // Rediriger vers l'application principale après un court délai
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
 
       } catch (error) {
         console.error('Erreur lors du traitement OAuth:', error);

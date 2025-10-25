@@ -231,9 +231,7 @@ class StatisticsService {
       `, [userId]);
       
       // Enregistrements de santé de l'utilisateur
-      // Pour l'instant, tous les health records sont comptés car il n'y a pas de user_id dans healthRecords
-      // On pourrait ajouter un filtre par user_id dans le futur
-      const healthCount = await executeQuery('SELECT COUNT(*) as total FROM healthRecords');
+      const healthCount = await executeQuery('SELECT COUNT(*) as total FROM healthRecords WHERE user_id = ?', [userId]);
       
       // Ventes de l'utilisateur
       const salesCount = await executeQuery('SELECT COUNT(*) as total FROM sales WHERE user_id = ?', [userId]);

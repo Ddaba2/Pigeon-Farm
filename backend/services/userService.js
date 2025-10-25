@@ -38,27 +38,37 @@ class UserService {
       const sql = 'SELECT id, username, email, full_name as fullName, role, status, avatar_url, google_id, auth_provider, created_at, updated_at, last_login, phone, address, bio FROM users WHERE id = ?';
       const users = await executeQuery(sql, [id]);
       
-      if (users[0] && users[0].avatar_url) {
+      if (!users[0]) {
+        return null;
+      }
+
+      const user = users[0];
+      
+      // S'assurer que les champs requis ont des valeurs par défaut
+      user.status = user.status || 'active';
+      user.role = user.role || 'user';
+      
+      if (user.avatar_url) {
         // Convertir le LONGBLOB en base64 pour l'affichage
         // Si c'est déjà un Buffer (nouveau stockage LONGBLOB)
-        if (Buffer.isBuffer(users[0].avatar_url)) {
-          users[0].avatar_url = `data:image/jpeg;base64,${users[0].avatar_url.toString('base64')}`;
+        if (Buffer.isBuffer(user.avatar_url)) {
+          user.avatar_url = `data:image/jpeg;base64,${user.avatar_url.toString('base64')}`;
         } 
         // Si c'est une string (ancien stockage ou URL HTTP)
-        else if (typeof users[0].avatar_url === 'string') {
+        else if (typeof user.avatar_url === 'string') {
           // Garder tel quel si c'est déjà une data URL ou une URL HTTP
-          if (!users[0].avatar_url.startsWith('data:') && !users[0].avatar_url.startsWith('http')) {
+          if (!user.avatar_url.startsWith('data:') && !user.avatar_url.startsWith('http')) {
             // Ancien format base64 sans préfixe
-            users[0].avatar_url = `data:image/jpeg;base64,${users[0].avatar_url}`;
+            user.avatar_url = `data:image/jpeg;base64,${user.avatar_url}`;
           }
         }
         // S'assurer que avatar_url est toujours une string
-        if (users[0].avatar_url && typeof users[0].avatar_url !== 'string') {
-          users[0].avatar_url = String(users[0].avatar_url);
+        if (user.avatar_url && typeof user.avatar_url !== 'string') {
+          user.avatar_url = String(user.avatar_url);
         }
       }
       
-      return users[0] || null;
+      return user;
     } catch (error) {
       console.error('Erreur lors de la récupération de l\'utilisateur:', error);
       throw error;
