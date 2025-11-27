@@ -1,0 +1,2 @@
+# Ce fichier permet de garder le dossier backups dans Git
+# Les fichiers de sauvegarde (*.json) sont ignorés par .gitignore

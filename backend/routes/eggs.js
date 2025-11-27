@@ -182,4 +182,87 @@ router.get('/stats/success-rate', authenticateUser, async (req, res) => {
   }
 });
 
+// 🆕 NOUVELLE ROUTE : Créer un œuf avec éclosion et pigeonneau en une transaction
+router.post('/with-hatching', authenticateUser, async (req, res) => {
+  try {
+    console.log('🔍 POST /eggs/with-hatching - Données reçues:', JSON.stringify(req.body, null, 2));
+    
+    const { eggData, pigeonneauData } = req.body;
+    
+    if (!eggData || !eggData.coupleId || !eggData.egg1Date) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Données d\'œuf incomplètes (coupleId et egg1Date requis)' 
+      });
+    }
+    
+    // Si pigeonneauData est fourni, vérifier le sexe
+    if (pigeonneauData && !pigeonneauData.sex) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Sexe du pigeonneau requis' 
+      });
+    }
+    
+    const result = await eggService.createEggWithHatching(eggData, pigeonneauData);
+    
+    console.log('✅ Transaction réussie:', result);
+    res.status(201).json({ 
+      success: true, 
+      data: result,
+      message: pigeonneauData 
+        ? 'Œuf et pigeonneau créés avec succès' 
+        : 'Œuf créé avec succès'
+    });
+  } catch (error) {
+    console.log('❌ Erreur transaction:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 🆕 NOUVELLE ROUTE : Marquer un œuf comme éclos et créer le pigeonneau
+router.post('/:id/hatch', authenticateUser, async (req, res) => {
+  try {
+    console.log('🔍 POST /eggs/:id/hatch - ID:', req.params.id);
+    console.log('🔍 Données reçues:', JSON.stringify(req.body, null, 2));
+    
+    const { hatchData, pigeonneauData } = req.body;
+    
+    if (!hatchData || !hatchData.hatchDate) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Date d\'éclosion requise' 
+      });
+    }
+    
+    if (!pigeonneauData || !pigeonneauData.sex) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Données du pigeonneau requises (au minimum le sexe)' 
+      });
+    }
+    
+    const result = await eggService.hatchEggAndCreatePigeonneau(
+      req.params.id,
+      hatchData,
+      pigeonneauData
+    );
+    
+    console.log('✅ Transaction réussie:', result);
+    res.json({ 
+      success: true, 
+      data: result,
+      message: 'Œuf éclos et pigeonneau créé avec succès'
+    });
+  } catch (error) {
+    console.log('❌ Erreur transaction:', error.message);
+    
+    if (error.message.includes('non trouvé')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router; 

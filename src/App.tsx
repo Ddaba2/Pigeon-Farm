@@ -16,6 +16,7 @@ import Notifications from './components/Notifications';
 import ErrorBoundary from './components/ErrorBoundary';
 import AccessibilityPanel from './components/AccessibilityPanel';
 import Base64Image from './components/Base64Image';
+import BackupRestore from './components/BackupRestore';
 import { User } from './types/types';
 import { useDarkMode } from './hooks/useDarkMode';
 import { edgeLocalStorage } from './utils/storageManager';
@@ -30,6 +31,7 @@ function App() {
   const [showAccessibilityPanel, setShowAccessibilityPanel] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const checkUserSession = async () => {
@@ -190,6 +192,8 @@ function App() {
         return <UsersManagement />;
       case 'profile':
         return <Profile user={user} onUpdate={setUser} />;
+      case 'backup':
+        return <BackupRestore />;
       case 'help':
         return <Documentation />;
       default:
@@ -207,19 +211,20 @@ function App() {
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
-                    <img 
-                      src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png" 
-                      alt="PigeonFarm Logo" 
-                      className="h-full w-full object-contain"
-                      onError={(e) => {
-                        // Fallback vers l'icône Bird si l'image ne charge pas
-                        e.currentTarget.style.display = 'none';
-                        const fallback = document.createElement('div');
-                        fallback.className = 'w-14 h-14 bg-gradient-to-br from-blue-500 to-green-500 rounded-xl flex items-center justify-center';
-                        fallback.innerHTML = '<svg class="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>';
-                        e.currentTarget.parentNode?.appendChild(fallback);
-                      }}
-                    />
+                    {logoError ? (
+                      <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-green-500 rounded-xl flex items-center justify-center">
+                        <svg className="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <img 
+                        src="/9abe145e-9bbd-4752-bc24-37264081befe-removebg-preview.png" 
+                        alt="PigeonFarm Logo" 
+                        className="h-full w-full object-contain"
+                        onError={() => setLogoError(true)}
+                      />
+                    )}
                   </div>
                   <h1 className="text-xl font-bold text-gray-900 dark:text-white">PigeonFarm</h1>
                 </div>

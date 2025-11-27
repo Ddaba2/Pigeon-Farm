@@ -1,4 +1,4 @@
-const { executeQuery } = require('../config/database');
+const { executeQuery, executeTransaction } = require('../config/database');
 
 class EggService {
   // Récupérer tous les œufs
@@ -271,6 +271,124 @@ class EggService {
       };
     } catch (error) {
       throw new Error(`Erreur lors du calcul du taux de réussite: ${error.message}`);
+    }
+  }
+
+  // 🆕 NOUVELLE MÉTHODE : Créer un œuf avec éclosion et pigeonneau en une transaction
+  async createEggWithHatching(eggData, pigeonneauData = null) {
+    try {
+      return await executeTransaction(async (connection) => {
+        // Étape 1 : Vérifier que le couple existe
+        const [coupleCheck] = await connection.execute(
+          'SELECT id FROM couples WHERE id = ?',
+          [eggData.coupleId]
+        );
+        
+        if (coupleCheck.length === 0) {
+          throw new Error("Le couple spécifié n'existe pas");
+        }
+
+        // Étape 2 : Créer l'enregistrement d'œuf
+        const [eggResult] = await connection.execute(
+          'INSERT INTO eggs (coupleId, egg1Date, egg2Date, hatchDate1, hatchDate2, success1, success2, observations, createdAt, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
+          [
+            eggData.coupleId,
+            eggData.egg1Date,
+            eggData.egg2Date || null,
+            eggData.hatchDate1 || null,
+            eggData.hatchDate2 || null,
+            eggData.success1 || false,
+            eggData.success2 || false,
+            eggData.observations || ''
+          ]
+        );
+
+        const eggId = eggResult.insertId;
+
+        // Étape 3 : Si éclosion réussie et données pigeonneau fournies, créer le pigeonneau
+        let pigeonneauId = null;
+        if (pigeonneauData && eggData.success1) {
+          const [pigeonneauResult] = await connection.execute(
+            'INSERT INTO pigeonneaux (coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, salePrice, saleDate, buyer, observations, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
+            [
+              eggData.coupleId,
+              eggId,
+              pigeonneauData.birthDate || eggData.hatchDate1,
+              pigeonneauData.sex,
+              pigeonneauData.weight || null,
+              pigeonneauData.weaningDate || null,
+              pigeonneauData.status || 'alive',
+              pigeonneauData.salePrice || null,
+              pigeonneauData.saleDate || null,
+              pigeonneauData.buyer || null,
+              pigeonneauData.observations || ''
+            ]
+          );
+          pigeonneauId = pigeonneauResult.insertId;
+        }
+
+        console.log('✅ Transaction réussie - Œuf ID:', eggId, 'Pigeonneau ID:', pigeonneauId || 'N/A');
+
+        return {
+          egg: { id: eggId, ...eggData },
+          pigeonneau: pigeonneauId ? { id: pigeonneauId, ...pigeonneauData } : null
+        };
+      });
+    } catch (error) {
+      console.error('❌ Erreur transaction createEggWithHatching:', error);
+      throw new Error('Erreur lors de la création de l\'œuf avec éclosion: ' + error.message);
+    }
+  }
+
+  // 🆕 NOUVELLE MÉTHODE : Marquer un œuf comme éclos et créer le pigeonneau en une transaction
+  async hatchEggAndCreatePigeonneau(eggId, hatchData, pigeonneauData) {
+    try {
+      return await executeTransaction(async (connection) => {
+        // Étape 1 : Vérifier que l'œuf existe
+        const [eggCheck] = await connection.execute(
+          'SELECT id, coupleId FROM eggs WHERE id = ?',
+          [eggId]
+        );
+        
+        if (eggCheck.length === 0) {
+          throw new Error("Enregistrement d'œufs non trouvé");
+        }
+
+        const egg = eggCheck[0];
+
+        // Étape 2 : Mettre à jour l'œuf avec la date d'éclosion
+        await connection.execute(
+          'UPDATE eggs SET hatchDate1 = ?, success1 = ?, observations = ?, updated_at = NOW() WHERE id = ?',
+          [hatchData.hatchDate, true, hatchData.observations || '', eggId]
+        );
+
+        // Étape 3 : Créer le pigeonneau
+        const [pigeonneauResult] = await connection.execute(
+          'INSERT INTO pigeonneaux (coupleId, eggRecordId, birthDate, sex, weight, weaningDate, status, observations, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
+          [
+            egg.coupleId,
+            eggId,
+            hatchData.hatchDate,
+            pigeonneauData.sex,
+            pigeonneauData.weight || null,
+            pigeonneauData.weaningDate || null,
+            'alive',
+            pigeonneauData.observations || ''
+          ]
+        );
+
+        const pigeonneauId = pigeonneauResult.insertId;
+
+        console.log('✅ Transaction réussie - Œuf éclos ID:', eggId, 'Pigeonneau créé ID:', pigeonneauId);
+
+        return {
+          egg: { id: eggId, ...hatchData },
+          pigeonneau: { id: pigeonneauId, ...pigeonneauData }
+        };
+      });
+    } catch (error) {
+      console.error('❌ Erreur transaction hatchEggAndCreatePigeonneau:', error);
+      throw new Error('Erreur lors de l\'éclosion de l\'œuf: ' + error.message);
     }
   }
 }

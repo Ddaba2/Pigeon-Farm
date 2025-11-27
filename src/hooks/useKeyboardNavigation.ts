@@ -54,9 +54,13 @@ export const useKeyboardNavigation = (shortcuts: KeyboardShortcut[]) => {
       
       document.body.appendChild(announcement);
       
-      // Remove after a short delay
+      // Remove after a short delay (safely)
       setTimeout(() => {
-        document.body.removeChild(announcement);
+        if (announcement.parentNode) {
+          announcement.parentNode.removeChild(announcement);
+        } else if (typeof (announcement as any).remove === 'function') {
+          (announcement as any).remove();
+        }
       }, 1000);
     }
   };

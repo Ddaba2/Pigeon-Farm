@@ -14,11 +14,11 @@ class StatisticsService {
       const pigeonneauxCount = await executeQuery('SELECT COUNT(*) as total FROM pigeonneaux');
       
       // Compter les enregistrements de santé
-      const healthCount = await executeQuery('SELECT COUNT(*) as total FROM healthRecords');
+      const healthCount = await executeQuery('SELECT COUNT(*) as total FROM healthrecords');
       
       // Compter les ventes
       const salesCount = await executeQuery('SELECT COUNT(*) as total FROM sales');
-      const salesRevenue = await executeQuery('SELECT SUM(amount) as total FROM sales');
+      const salesRevenue = await executeQuery('SELECT COALESCE(SUM(amount), 0) as total FROM sales');
       
       // Compter les couples par statut
       const couplesByStatus = await executeQuery(`
@@ -61,7 +61,7 @@ class StatisticsService {
         SELECT 
           type,
           COUNT(*) as count
-        FROM healthRecords
+        FROM healthrecords
         GROUP BY type
       `);
       
@@ -83,7 +83,7 @@ class StatisticsService {
          LIMIT 2)
         UNION ALL
         (SELECT 'health' as type, CONCAT(type, ' - ', product) as description, created_at as date, id, 'Heart' as icon
-         FROM healthRecords
+         FROM healthrecords
          ORDER BY created_at DESC
          LIMIT 2)
         UNION ALL
@@ -167,7 +167,7 @@ class StatisticsService {
           SUM(CASE WHEN type = 'vaccination' THEN 1 ELSE 0 END) as vaccinations,
           SUM(CASE WHEN type = 'traitement' THEN 1 ELSE 0 END) as treatments,
           SUM(CASE WHEN type = 'exam' OR type = 'examen' THEN 1 ELSE 0 END) as exams
-        FROM healthRecords
+        FROM healthrecords
       `);
       
       // Évolution mensuelle (6 derniers mois)
@@ -182,7 +182,7 @@ class StatisticsService {
           UNION ALL
           SELECT created_at FROM pigeonneaux
           UNION ALL
-          SELECT created_at FROM healthRecords
+          SELECT created_at FROM healthrecords
         ) as all_records
         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
         GROUP BY DATE_FORMAT(created_at, '%Y-%m')
@@ -231,7 +231,7 @@ class StatisticsService {
       `, [userId]);
       
       // Enregistrements de santé de l'utilisateur
-      const healthCount = await executeQuery('SELECT COUNT(*) as total FROM healthRecords WHERE user_id = ?', [userId]);
+      const healthCount = await executeQuery('SELECT COUNT(*) as total FROM healthrecords WHERE user_id = ?', [userId]);
       
       // Ventes de l'utilisateur
       const salesCount = await executeQuery('SELECT COUNT(*) as total FROM sales WHERE user_id = ?', [userId]);

@@ -23,7 +23,12 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const [stats, setStats] = useState<DashboardStats>({
+  const [stats, setStats] = useState<DashboardStats>(() => {
+    try {
+      const cached = localStorage.getItem('dashboardStatsCache');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return {
     totalCouples: 0,
     totalEggs: 0,
     totalPigeonneaux: 0,
@@ -31,12 +36,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     totalSales: 0,
     totalRevenue: 0,
     recentActivities: []
+    } as DashboardStats;
   });
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Charger les vraies données depuis l'API
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
+        setLoading(true);
         const response = await apiService.getDashboardStats();
         if (response.success && response.data) {
         setStats({
@@ -48,10 +56,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             totalRevenue: response.data.totalRevenue || 0,
             recentActivities: response.data.recentActivities || []
           });
+          try { localStorage.setItem('dashboardStatsCache', JSON.stringify({
+            totalCouples: response.data.totalCouples || 0,
+            totalEggs: response.data.totalEggs || 0,
+            totalPigeonneaux: response.data.totalPigeonneaux || 0,
+            totalHealthRecords: response.data.totalHealthRecords || 0,
+            totalSales: response.data.totalSales || 0,
+            totalRevenue: response.data.totalRevenue || 0,
+            recentActivities: response.data.recentActivities || []
+          })); } catch {}
         }
-    } catch (error) {
+      } catch (error) {
         // Erreur chargement tableau de bord ignorée
-      }
+      } finally { setLoading(false); }
     };
 
     loadDashboardData();
@@ -61,6 +78,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     
     return () => clearInterval(interval);
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   const getIcon = (iconName: string) => {
     switch (iconName) {

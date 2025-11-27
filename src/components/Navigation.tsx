@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Users, FileText, Activity, Heart, TrendingUp, FileText as FileTextIcon, Settings, Accessibility } from 'lucide-react';
+import { BarChart3, Users, FileText, Activity, Heart, TrendingUp, FileText as FileTextIcon, Settings, Accessibility, Database } from 'lucide-react';
 import { useAccessibility } from '../hooks/useAccessibility';
 
 interface NavigationProps {
@@ -20,6 +20,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, userRo
     { id: 'pigeonneaux', label: 'Pigeonneaux', icon: Activity },
     { id: 'health', label: 'Santé', icon: Heart },
     { id: 'statistics', label: 'Statistiques', icon: TrendingUp },
+    { id: 'backup', label: 'Sauvegarde', icon: Database },
     { id: 'help', label: 'Aide', icon: Settings },
   ];
   

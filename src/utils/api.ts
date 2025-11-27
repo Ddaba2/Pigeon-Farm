@@ -537,12 +537,12 @@ export const getNotificationCount = async () => {
 
 // Marquer une notification comme lue
 export const markNotificationAsRead = async (notificationId: number) => {
-  return apiService.put(`/notifications/${notificationId}/read`);
+  return apiService.put(`/notifications/${notificationId}/read`, {});
 };
 
 // Marquer toutes les notifications comme lues
 export const markAllNotificationsAsRead = async () => {
-  return apiService.put('/notifications/read-all');
+  return apiService.put('/notifications/read-all', {});
 };
 
 // Supprimer une notification
@@ -585,6 +585,44 @@ export const createCustomAlert = async (title: string, message: string, type = '
 // Tester les alertes (admin seulement)
 export const testAlerts = async () => {
   return apiService.get('/alerts/test');
+};
+
+// ========== EXPORT DU SERVICE ==========
+
+// ========== SAUVEGARDE & RESTAURATION ==========
+
+// Exporter les données utilisateur (téléchargement JSON)
+export const exportUserData = async () => {
+  return apiService.get('/backup/export');
+};
+
+// Sauvegarder les données sur le serveur
+export const saveBackupToServer = async () => {
+  return apiService.post('/backup/save', {});
+};
+
+// Importer/Restaurer des données depuis un fichier JSON
+export const importUserData = async (backupData: any, clearExisting = false) => {
+  return apiService.post('/backup/import', { 
+    backupData, 
+    clearExisting,
+    skipNotifications: true 
+  });
+};
+
+// Lister les sauvegardes disponibles sur le serveur
+export const listBackups = async () => {
+  return apiService.get('/backup/list');
+};
+
+// Restaurer depuis une sauvegarde serveur
+export const restoreFromServerBackup = async (filename: string, clearExisting = false) => {
+  return apiService.post(`/backup/restore/${filename}`, { clearExisting });
+};
+
+// Supprimer toutes les données utilisateur (avec confirmation mot de passe)
+export const clearAllUserData = async (confirmPassword: string) => {
+  return apiService.delete('/backup/clear', { confirmPassword });
 };
 
 // ========== EXPORT DU SERVICE ==========

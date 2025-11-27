@@ -1,0 +1,58 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "exportDate": "2025-10-28T22:08:59.051Z",
+    "userId": 1,
+    "username": "admin"
+  },
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@pigeonfarm.com",
+    "full_name": "Administrateur",
+    "role": "admin",
+    "avatar_url": null,
+    "created_at": "2025-10-24T20:17:28.000Z"
+  },
+  "couples": [],
+  "eggs": [],
+  "pigeonneaux": [],
+  "healthRecords": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "type": "examen",
+      "targetType": "couple",
+      "targetId": 3,
+      "product": "POIU",
+      "date": "2025-10-24T00:00:00.000Z",
+      "nextDue": null,
+      "observations": "",
+      "created_at": "2025-10-24T20:22:46.000Z",
+      "updated_at": "2025-10-24T21:42:03.000Z"
+    },
+    {
+      "id": 2,
+      "user_id": 1,
+      "type": "traitement",
+      "targetType": "couple",
+      "targetId": 3,
+      "product": "FJ",
+      "date": "2025-10-24T00:00:00.000Z",
+      "nextDue": null,
+      "observations": "",
+      "created_at": "2025-10-24T20:27:45.000Z",
+      "updated_at": "2025-10-24T21:42:03.000Z"
+    }
+  ],
+  "sales": [],
+  "notifications": [],
+  "preferences": [],
+  "statistics": {
+    "totalCouples": 0,
+    "totalEggs": 0,
+    "totalPigeonneaux": 0,
+    "totalHealthRecords": 2,
+    "totalSales": 0
+  }
+}

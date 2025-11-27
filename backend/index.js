@@ -37,6 +37,7 @@ const notificationsRouter = require('./routes/notifications.js');
 const alertsRouter = require('./routes/alerts.js');
 const userPreferencesRouter = require('./routes/userPreferences.js');
 const archiveRouter = require('./routes/archive.js');
+const backupRouter = require('./routes/backup.js');
 
 const app = express();
 const port = config.port;
@@ -210,6 +211,7 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/alerts', alertsRouter);
 app.use('/api/user-preferences', userPreferencesRouter);
 app.use('/api/archive', archiveRouter);
+app.use('/api/backup', backupRouter);
 
 // Routes d'administration (ordre important - spécifiques avant générales)
 app.use('/api/admin/trends', adminTrendsRouter);
