@@ -28,6 +28,15 @@ export async function updateCouple(id: number, c: Partial<Couple>): Promise<void
 }
 
 export async function deleteCouple(id: number): Promise<void> {
-  await run('DELETE FROM couples WHERE id=?', [id]);
+  // Supprimer toutes les données liées au couple avant de supprimer le couple lui-même
+  await run('DELETE FROM health_records WHERE target_type = ? AND target_id = ?', ['couple', id]);
+  await run('DELETE FROM eggs WHERE couple_id = ?', [id]);
+  // Les pigeonneaux liés (via couple_id) sont supprimés avec leurs dossiers santé
+  const pigeonneaux = await query<{ id: number }>('SELECT id FROM pigeonneaux WHERE couple_id = ?', [id]);
+  for (const p of pigeonneaux) {
+    await run('DELETE FROM health_records WHERE target_type = ? AND target_id = ?', ['pigeonneau', p.id]);
+  }
+  await run('DELETE FROM pigeonneaux WHERE couple_id = ?', [id]);
+  await run('DELETE FROM couples WHERE id = ?', [id]);
   await saveStore();
 }

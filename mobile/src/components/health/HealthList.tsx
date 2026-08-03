@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Heart, Search, AlertTriangle, ChevronDown } from 'lucide-react';
 import { HealthRecord } from '../../types';
 import { getHealthRecords, deleteHealthRecord } from '../../services/healthService';
+import { scheduleHealthReminders } from '../../services/notificationService';
 import { HealthForm } from './HealthForm';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -63,7 +64,9 @@ export function HealthList() {
 
   const handleDelete = async (id: number) => {
     if (!confirm('Supprimer ce soin ?')) return;
-    await deleteHealthRecord(id); load();
+    await deleteHealthRecord(id);
+    scheduleHealthReminders().catch(() => {});
+    load();
   };
 
   const handleSaved = () => { setShowForm(false); setEditing(null); load(); };

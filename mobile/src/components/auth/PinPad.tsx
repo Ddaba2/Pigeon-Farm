@@ -12,8 +12,16 @@ const PIN_LENGTH = 4;
 export function PinPad({ onComplete, error, loading }: Props) {
   const [digits, setDigits] = useState<string[]>([]);
 
+  const haptic = (duration: number = 10) => {
+    try {
+      // Vibration native via API web standard (Android WebView)
+      if (navigator?.vibrate) navigator.vibrate(duration);
+    } catch { /* ignoré si non supporté */ }
+  };
+
   const push = (d: string) => {
     if (digits.length >= PIN_LENGTH || loading) return;
+    haptic(10);
     const next = [...digits, d];
     setDigits(next);
     if (next.length === PIN_LENGTH) {
@@ -26,6 +34,7 @@ export function PinPad({ onComplete, error, loading }: Props) {
 
   const pop = () => {
     if (loading) return;
+    haptic(25);
     setDigits(d => d.slice(0, -1));
   };
 

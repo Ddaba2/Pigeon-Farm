@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import { HealthRecord } from '../../types';
 import { createHealthRecord, updateHealthRecord } from '../../services/healthService';
+import { scheduleHealthReminders } from '../../services/notificationService';
 
 interface Props { record?: HealthRecord; onSave: () => void; onCancel: () => void }
 
@@ -27,6 +28,7 @@ export function HealthForm({ record, onSave, onCancel }: Props) {
     try {
       if (record?.id) await updateHealthRecord(record.id, form as Partial<HealthRecord>);
       else             await createHealthRecord(form as Omit<HealthRecord, 'id'>);
+      scheduleHealthReminders().catch(() => {});
       onSave();
     } finally { setSaving(false); }
   };

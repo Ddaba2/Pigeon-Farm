@@ -82,7 +82,12 @@ export async function authenticateUser(
   }
 
   const salt = buildUserSalt(userId, user.created_at!);
-  const ok = await verifyPIN(pin, salt, user.pin_hash);
+  const { valid: ok, newHash } = await verifyPIN(pin, salt, user.pin_hash);
+
+  // Migration transparente SHA-256 → PBKDF2 si le hash a été reclassifié
+  if (ok && newHash) {
+    await run('UPDATE users SET pin_hash = ? WHERE id = ?', [newHash, userId]);
+  }
 
   if (!ok) {
     const attempts = (user.failed_attempts ?? 0) + 1;
@@ -108,6 +113,15 @@ export async function authenticateUser(
   );
   await saveStore();
   return { success: true, user: { ...user, failed_attempts: 0, locked_until: undefined } };
+}
+
+// Déverrouille immédiatement un compte bloqué (réservé à l'administrateur)
+export async function unlockUser(id: number): Promise<void> {
+  await run(
+    `UPDATE users SET locked_until = NULL, failed_attempts = 0, updated_at = datetime('now') WHERE id = ?`,
+    [id],
+  );
+  await saveStore();
 }
 
 export async function countUsers(): Promise<number> {

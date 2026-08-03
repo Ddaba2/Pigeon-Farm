@@ -6,6 +6,10 @@ import { CoupleForm } from './CoupleForm';
 import { CoupleHistory } from './CoupleHistory';
 import { useApp } from '../../context/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import { SkeletonList } from '../ui/Skeleton';
+import { ConfirmModal } from '../ui/ConfirmModal';
+
+const PAGE_SIZE = 20;
 
 export function CouplesList() {
   const [couples, setCouples]         = useState<Couple[]>([]);
@@ -15,6 +19,8 @@ export function CouplesList() {
   const [search, setSearch]           = useState('');
   const [filter, setFilter]           = useState<'tous' | 'actif' | 'inactif'>('tous');
   const [loading, setLoading]         = useState(true);
+  const [page, setPage]               = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<Couple | null>(null);
   const { refreshStats }              = useApp();
   const { canEdit, canDelete }        = usePermissions();
 
@@ -36,9 +42,15 @@ export function CouplesList() {
     return matchFilter && matchSearch;
   });
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Supprimer ce couple et toutes ses données ?')) return;
-    await deleteCouple(id); load(); refreshStats();
+  const paginated = filtered.slice(0, page * PAGE_SIZE);
+  const hasMore   = filtered.length > paginated.length;
+
+  const handleDelete = async () => {
+    if (!deleteTarget?.id) return;
+    await deleteCouple(deleteTarget.id);
+    setDeleteTarget(null);
+    load();
+    refreshStats();
   };
 
   const handleSaved = () => { setShowForm(false); setEditing(null); load(); refreshStats(); };
@@ -68,14 +80,14 @@ export function CouplesList() {
           className="input pl-9 text-sm"
           placeholder="Rechercher nid, race, bague…"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
         />
       </div>
 
       {/* Filtres */}
       <div className="flex gap-2 mb-4">
         {(['tous', 'actif', 'inactif'] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
+          <button key={f} onClick={() => { setFilter(f); setPage(1); }}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
               filter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
             }`}>
@@ -86,61 +98,80 @@ export function CouplesList() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Chargement…</div>
+        <SkeletonList count={4} lines={3} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <Users size={56} className="mx-auto text-gray-200 mb-4" />
           <p className="text-gray-400 mb-6">{search ? 'Aucun résultat' : 'Aucun couple enregistré'}</p>
-          {!search && (
+          {!search && canEdit && (
             <button onClick={() => setShowForm(true)} className="bg-primary-600 text-white px-8 py-3 rounded-full font-semibold">
               Ajouter un couple
             </button>
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map(c => (
-            <div key={c.id} className="card">
-              <div className="flex items-start">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-gray-800 dark:text-gray-100">Nid #{c.nest_number}</span>
-                    <span className={`badge ${c.status === 'actif' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {c.status}
-                    </span>
-                    {!c.synced && <span className="badge bg-orange-100 text-orange-600">Non sync.</span>}
+        <>
+          <div className="space-y-3">
+            {paginated.map(c => (
+              <div key={c.id} className="card">
+                <div className="flex items-start">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-gray-800 dark:text-gray-100">Nid #{c.nest_number}</span>
+                      <span className={`badge ${c.status === 'actif' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {c.status}
+                      </span>
+                      {!c.synced && <span className="badge bg-orange-100 text-orange-600">Non sync.</span>}
+                    </div>
+                    {c.race && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Race : {c.race}</p>}
+                    <div className="flex gap-4 mt-1">
+                      {c.male_ring   && <span className="text-xs text-blue-600">♂ {c.male_ring}</span>}
+                      {c.female_ring && <span className="text-xs text-pink-600">♀ {c.female_ring}</span>}
+                    </div>
+                    {c.formation_date && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Formé le {new Date(c.formation_date).toLocaleDateString('fr-FR')}
+                      </p>
+                    )}
                   </div>
-                  {c.race && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Race : {c.race}</p>}
-                  <div className="flex gap-4 mt-1">
-                    {c.male_ring   && <span className="text-xs text-blue-600">♂ {c.male_ring}</span>}
-                    {c.female_ring && <span className="text-xs text-pink-600">♀ {c.female_ring}</span>}
+                  <div className="flex gap-1.5 ml-2 shrink-0">
+                    <button onClick={() => setViewHistory(c)} className="btn-icon text-purple-500 bg-purple-50 dark:bg-purple-900/30" title="Historique">
+                      <History size={17} />
+                    </button>
+                    {canEdit && (
+                      <button onClick={() => setEditing(c)} className="btn-icon text-blue-500 bg-blue-50 dark:bg-blue-900/30">
+                        <Edit2 size={17} />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => setDeleteTarget(c)} className="btn-icon text-red-500 bg-red-50 dark:bg-red-900/30">
+                        <Trash2 size={17} />
+                      </button>
+                    )}
                   </div>
-                  {c.formation_date && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Formé le {new Date(c.formation_date).toLocaleDateString('fr-FR')}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-1.5 ml-2 shrink-0">
-                  <button onClick={() => setViewHistory(c)} className="btn-icon text-purple-500 bg-purple-50 dark:bg-purple-900/30" title="Historique">
-                    <History size={17} />
-                  </button>
-                  {canEdit && (
-                    <button onClick={() => setEditing(c)} className="btn-icon text-blue-500 bg-blue-50 dark:bg-blue-900/30">
-                      <Edit2 size={17} />
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button onClick={() => c.id && handleDelete(c.id)} className="btn-icon text-red-500 bg-red-50 dark:bg-red-900/30">
-                      <Trash2 size={17} />
-                    </button>
-                  )}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          {hasMore && (
+            <button
+              onClick={() => setPage(p => p + 1)}
+              className="w-full mt-4 py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-medium active:scale-95 transition-transform"
+            >
+              Afficher plus ({filtered.length - paginated.length} restants)
+            </button>
+          )}
+        </>
       )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        title="Supprimer ce couple ?"
+        message="Toutes les données liées seront supprimées (œufs, pigeonneaux, santé)."
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

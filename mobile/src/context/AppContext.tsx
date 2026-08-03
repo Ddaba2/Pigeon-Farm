@@ -5,6 +5,7 @@ import { useDarkMode } from '../hooks/useDarkMode';
 
 interface CountRow { count: number }
 interface SalesRow { count: number; total: number }
+interface TotalRow  { total: number }
 
 interface AppContextType {
   stats: AppStats;
@@ -23,6 +24,8 @@ const defaultStats: AppStats = {
   pigeonneauxVivants: 0,
   totalSales: 0,
   totalRevenue: 0,
+  totalExpenses: 0,
+  netProfit: 0,
   pendingSync: 0,
 };
 
@@ -42,21 +45,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const refreshStats = useCallback(async () => {
     try {
-      const [couples, active, eggs, pigeons, vivants, salesRows, p1, p2, p3, p4, p5] = await Promise.all([
+      const [couples, active, eggs, pigeons, vivants, salesRows, expenseRows, p1, p2, p3, p4, p5, p6] = await Promise.all([
         query<CountRow>('SELECT COUNT(*) as count FROM couples'),
         query<CountRow>('SELECT COUNT(*) as count FROM couples WHERE status = "actif"'),
         query<CountRow>('SELECT COUNT(*) as count FROM eggs'),
         query<CountRow>('SELECT COUNT(*) as count FROM pigeonneaux'),
         query<CountRow>('SELECT COUNT(*) as count FROM pigeonneaux WHERE status = "vivant"'),
         query<SalesRow>('SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM sales'),
+        query<TotalRow>('SELECT COALESCE(SUM(amount),0) as total FROM expenses'),
         query<CountRow>('SELECT COUNT(*) as count FROM couples WHERE synced = 0'),
         query<CountRow>('SELECT COUNT(*) as count FROM eggs WHERE synced = 0'),
         query<CountRow>('SELECT COUNT(*) as count FROM pigeonneaux WHERE synced = 0'),
         query<CountRow>('SELECT COUNT(*) as count FROM health_records WHERE synced = 0'),
         query<CountRow>('SELECT COUNT(*) as count FROM sales WHERE synced = 0'),
+        query<CountRow>('SELECT COUNT(*) as count FROM expenses WHERE synced = 0'),
       ]);
 
-      const pendingSync = [p1, p2, p3, p4, p5].reduce((s, r) => s + (r[0]?.count ?? 0), 0);
+      const pendingSync = [p1, p2, p3, p4, p5, p6].reduce((s, r) => s + (r[0]?.count ?? 0), 0);
+      const totalRevenue   = salesRows[0]?.total   ?? 0;
+      const totalExpenses  = expenseRows[0]?.total ?? 0;
 
       setStats({
         totalCouples:     couples[0]?.count   ?? 0,
@@ -65,7 +72,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         totalPigeonneaux: pigeons[0]?.count   ?? 0,
         pigeonneauxVivants: vivants[0]?.count ?? 0,
         totalSales:       salesRows[0]?.count ?? 0,
-        totalRevenue:     salesRows[0]?.total ?? 0,
+        totalRevenue,
+        totalExpenses,
+        netProfit: totalRevenue - totalExpenses,
         pendingSync,
       });
     } catch (err) {

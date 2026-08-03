@@ -89,6 +89,25 @@ const SCHEMA = [
     synced INTEGER NOT NULL DEFAULT 0, server_id INTEGER,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL DEFAULT 'alimentation',
+    date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    description TEXT,
+    notes TEXT,
+    synced INTEGER NOT NULL DEFAULT 0, server_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+];
+
+// Migrations appliquées aux deux backends (ne jamais réordonner, seulement ajouter)
+const MIGRATIONS = [
+  "ALTER TABLE sales ADD COLUMN target_type TEXT NOT NULL DEFAULT 'pigeonneau'",
+  "ALTER TABLE sales ADD COLUMN target_id TEXT",
+  "ALTER TABLE pigeonneaux ADD COLUMN photo TEXT",
+  "ALTER TABLE couples ADD COLUMN male_photo TEXT",
+  "ALTER TABLE couples ADD COLUMN female_photo TEXT",
 ];
 
 // ─── Backend NAVIGATEUR : sql.js ──────────────────────────────────────────────
@@ -115,11 +134,7 @@ async function createBrowserBackend(): Promise<DbBackend> {
   }
   for (const stmt of SCHEMA) db.run(stmt);
   // Migrations : ajout de colonnes si elles n'existent pas encore
-  const migrations = [
-    "ALTER TABLE sales ADD COLUMN target_type TEXT NOT NULL DEFAULT 'pigeonneau'",
-    "ALTER TABLE sales ADD COLUMN target_id TEXT",
-  ];
-  for (const m of migrations) {
+  for (const m of MIGRATIONS) {
     try { db.run(m); } catch { /* colonne déjà présente */ }
   }
 
@@ -166,6 +181,10 @@ async function createNativeBackend(): Promise<DbBackend> {
   }
   await db.open();
   for (const stmt of SCHEMA) await db.execute(stmt);
+  // Appliquer les mêmes migrations que le backend browser
+  for (const m of MIGRATIONS) {
+    try { await db.execute(m); } catch { /* colonne déjà présente */ }
+  }
 
   const query = async <T>(sql: string, values: unknown[] = []): Promise<T[]> => {
     const result = await db.query(sql, values);

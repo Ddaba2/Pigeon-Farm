@@ -1,7 +1,9 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getUpcomingDue } from './healthService';
+import { getSetting, setSetting } from './userService';
 
 const NOTIF_CHANNEL_ID = 'health-reminders';
+const REMINDERS_ENABLED_KEY = 'health_reminders_enabled';
 
 async function isSupported(): Promise<boolean> {
   try {
@@ -12,7 +14,36 @@ async function isSupported(): Promise<boolean> {
   }
 }
 
+// Activés par défaut : seule une désactivation explicite dans les réglages
+// (valeur 'false' stockée) désactive les rappels.
+export async function areHealthRemindersEnabled(): Promise<boolean> {
+  return (await getSetting(REMINDERS_ENABLED_KEY)) !== 'false';
+}
+
+export async function setHealthRemindersEnabled(enabled: boolean): Promise<void> {
+  await setSetting(REMINDERS_ENABLED_KEY, enabled ? 'true' : 'false');
+  if (enabled) {
+    await scheduleHealthReminders();
+  } else {
+    try { await LocalNotifications.cancel(await LocalNotifications.getPending()); } catch { /* ignore */ }
+  }
+}
+
+// Permet à l'UI de réagir au tap sur une notification (navigation vers la fiche santé).
+export async function initHealthReminderTapListener(onTap: (recordId: number) => void): Promise<void> {
+  try {
+    await LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+      const recordId = action.notification.extra?.recordId;
+      if (recordId != null) onTap(Number(recordId));
+    });
+  } catch {
+    // API non disponible (ex: web) — best-effort, silencieux
+  }
+}
+
 export async function scheduleHealthReminders(): Promise<void> {
+  if (!(await areHealthRemindersEnabled())) return;
+
   const supported = await isSupported();
   if (!supported) return;
 

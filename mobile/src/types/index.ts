@@ -105,6 +105,26 @@ export interface Sale {
   created_at?: string;
 }
 
+export type ExpenseCategory =
+  | 'alimentation'
+  | 'medicaments'
+  | 'equipement'
+  | 'veterinaire'
+  | 'transport'
+  | 'autre';
+
+export interface Expense {
+  id?: number;
+  category: ExpenseCategory;
+  date: string;
+  amount: number;
+  description?: string;
+  notes?: string;
+  synced?: number;
+  server_id?: number;
+  created_at?: string;
+}
+
 export interface AppStats {
   totalCouples: number;
   activeCouples: number;
@@ -113,5 +133,7 @@ export interface AppStats {
   pigeonneauxVivants: number;
   totalSales: number;
   totalRevenue: number;
+  totalExpenses: number;
+  netProfit: number;
   pendingSync: number;
 }

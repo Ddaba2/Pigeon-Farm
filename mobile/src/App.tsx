@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initDatabase } from './db/DatabaseService';
-import { scheduleHealthReminders } from './services/notificationService';
+import { scheduleHealthReminders, initHealthReminderTapListener } from './services/notificationService';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BottomNav } from './components/layout/BottomNav';
@@ -15,6 +15,7 @@ import { SalesList } from './components/sales/SalesList';
 import { HealthList } from './components/health/HealthList';
 import { StatisticsPage } from './components/statistics/StatisticsPage';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { ExpensesList } from './components/expenses/ExpensesList';
 import { useApp } from './context/AppContext';
 import { usePermissions } from './hooks/usePermissions';
 
@@ -30,6 +31,7 @@ function Screen() {
       {activeTab === 'pigeonneaux' && <PigeonneauxList />}
       {activeTab === 'sales'       && <SalesList />}
       {activeTab === 'health'      && <HealthList />}
+      {activeTab === 'expenses'    && <ExpensesList />}
       {activeTab === 'stats'       && (
         canViewStats
           ? <StatisticsPage />
@@ -43,6 +45,16 @@ function Screen() {
   );
 }
 
+function NotificationBridge() {
+  const { setActiveTab } = useApp();
+
+  useEffect(() => {
+    initHealthReminderTapListener(() => setActiveTab('health'));
+  }, [setActiveTab]);
+
+  return null;
+}
+
 function AuthGate() {
   const { isSetupDone, isAuthenticated, farmMode } = useAuth();
 
@@ -52,6 +64,7 @@ function AuthGate() {
   return (
     <AppProvider>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+        <NotificationBridge />
         <SyncBanner />
         <main className="flex-1 overflow-auto pb-16">
           <Screen />

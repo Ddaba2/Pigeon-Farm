@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit2, Trash2, UserX, UserCheck, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, UserX, UserCheck, Users, Unlock } from 'lucide-react';
 import { AppUser } from '../../types';
-import { getUsers, deleteUser, toggleUserActive } from '../../services/userService';
+import { getUsers, deleteUser, toggleUserActive, unlockUser } from '../../services/userService';
 import { logActivity } from '../../services/activityService';
 import { useAuth } from '../../context/AuthContext';
 import { UserForm } from './UserForm';
@@ -54,6 +54,12 @@ export function UserManagement() {
       `Compte ${u.is_active ? 'désactivé' : 'réactivé'} : ${u.name}`,
       'user', u.id
     );
+    load();
+  };
+
+  const handleUnlock = async (u: AppUser) => {
+    await unlockUser(u.id!);
+    await logActivity(currentUser?.id, currentUser?.name ?? '', `Compte déverrouillé : ${u.name}`, 'user', u.id);
     load();
   };
 
@@ -113,9 +119,23 @@ export function UserManagement() {
                       Dernière connexion : {new Date(u.last_login).toLocaleDateString('fr-FR')}
                     </p>
                   )}
+                  {u.locked_until && new Date(u.locked_until).getTime() > Date.now() && (
+                    <p className="text-xs text-red-500 mt-0.5 font-medium">
+                      Bloqué jusqu'à {new Date(u.locked_until).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex gap-1.5 shrink-0">
+                  {u.locked_until && new Date(u.locked_until).getTime() > Date.now() && (
+                    <button
+                      onClick={() => handleUnlock(u)}
+                      className="btn-icon text-amber-600 bg-amber-50 dark:bg-amber-900/20"
+                      title="Déverrouiller le compte"
+                    >
+                      <Unlock size={16} />
+                    </button>
+                  )}
                   <button
                     onClick={() => handleToggle(u)}
                     className={`btn-icon ${u.is_active ? 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'text-green-500 bg-green-50 dark:bg-green-900/20'}`}

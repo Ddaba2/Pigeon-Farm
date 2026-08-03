@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Trash2 } from 'lucide-react';
 import { Pigeonneau, Couple } from '../../types';
 import { createPigeonneau, updatePigeonneau } from '../../services/pigeonneauService';
 import { getCouples } from '../../services/coupleService';
@@ -21,8 +21,24 @@ export function PigeonneauForm({ pigeonneau: p, onSave, onCancel }: Props) {
     sale_date:    p?.sale_date    ?? '',
     buyer_name:   p?.buyer_name   ?? '',
     observations: p?.observations ?? '',
+    photo: (p as any)?.photo ?? '',
   });
   const [saving, setSaving] = useState(false);
+
+  const takePhoto = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => setForm(f => ({ ...f, photo: (e.target?.result as string) ?? '' }));
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  };
 
   useEffect(() => { getCouples().then(c => { setCouples(c); if (!p && c.length) setForm(f => ({ ...f, couple_id: c[0].id! })); }); }, []);
 
@@ -120,6 +136,31 @@ export function PigeonneauForm({ pigeonneau: p, onSave, onCancel }: Props) {
           <span className="text-sm font-medium text-gray-700">Observations</span>
           <textarea className="input mt-1 resize-none" rows={2} value={form.observations} onChange={set('observations')} placeholder="Notes…" />
         </label>
+
+        {/* Photo */}
+        <div className="block">
+          <span className="text-sm font-medium text-gray-700 block mb-2">Photo</span>
+          {form.photo ? (
+            <div className="relative w-32 h-32">
+              <img src={form.photo} alt="Pigeonneau" className="w-32 h-32 object-cover rounded-2xl" />
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, photo: '' }))}
+                className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 shadow"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={takePhoto}
+              className="flex items-center gap-2 px-4 py-2 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 active:scale-95 transition-transform"
+            >
+              <Camera size={20} /> Prendre / choisir une photo
+            </button>
+          )}
+        </div>
 
         <button onClick={handleSave} disabled={saving} className="btn-primary mt-2">
           <Save size={20} /> {saving ? 'Enregistrement…' : 'Enregistrer'}
